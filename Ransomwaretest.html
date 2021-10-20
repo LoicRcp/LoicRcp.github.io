@@ -1,0 +1,200 @@
+<html>
+
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Generator content="Microsoft Word 15 (filtered)">
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:Wingdings;
+	panose-1:5 0 0 0 0 0 0 0 0 0;}
+@font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:8.0pt;
+	margin-left:0cm;
+	line-height:107%;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;}
+p.MsoListParagraph, li.MsoListParagraph, div.MsoListParagraph
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:8.0pt;
+	margin-left:36.0pt;
+	line-height:107%;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;}
+p.MsoListParagraphCxSpFirst, li.MsoListParagraphCxSpFirst, div.MsoListParagraphCxSpFirst
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:0cm;
+	margin-left:36.0pt;
+	line-height:107%;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;}
+p.MsoListParagraphCxSpMiddle, li.MsoListParagraphCxSpMiddle, div.MsoListParagraphCxSpMiddle
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:0cm;
+	margin-left:36.0pt;
+	line-height:107%;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;}
+p.MsoListParagraphCxSpLast, li.MsoListParagraphCxSpLast, div.MsoListParagraphCxSpLast
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:8.0pt;
+	margin-left:36.0pt;
+	line-height:107%;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;}
+.MsoChpDefault
+	{font-family:"Calibri",sans-serif;}
+.MsoPapDefault
+	{margin-bottom:8.0pt;
+	line-height:107%;}
+ /* Page Definitions */
+ @page WordSection1
+	{size:595.3pt 841.9pt;
+	margin:70.85pt 70.85pt 70.85pt 70.85pt;}
+div.WordSection1
+	{page:WordSection1;}
+ /* List Definitions */
+ ol
+	{margin-bottom:0cm;}
+ul
+	{margin-bottom:0cm;}
+-->
+</style>
+
+</head>
+
+<body lang=FR style='word-wrap:break-word'>
+
+<div class=WordSection1>
+
+<p class=MsoNormal align=center style='text-align:center'><span
+style='font-size:18.0pt;line-height:107%;color:red'>Rapport de travail</span></p>
+
+<p class=MsoNormal align=center style='text-align:center'><span
+style='font-size:16.0pt;line-height:107%;color:red'>Réparation et refonte de la
+sécurité informatique d’une PME suite à une attaque de Ransomware</span></p>
+
+<p class=MsoNormal><span style='color:red'>&nbsp;</span></p>
+
+<p class=MsoNormal style='text-align:justify'>Mise en contexte&nbsp;:</p>
+
+<p class=MsoNormal style='text-align:justify'>La PME (Plomberie) dans laquelle
+mon oncle travaille s’est fait pirater. Un ransomware à bloquer un ordinateur
+et crypter les fichiers. C’est l’ordinateur du patron qui s’est fait infecter,
+par le ransomware «&nbsp;BABUK&nbsp;». Il s’agit d’un groupe de Hacker ayant
+développé un ransomware, mais à eu des problèmes avec les États-Unis, car ils
+ont piraté la police de Washington. Ils ont alors rendu publique un générateur
+pour leur ransomware, puis se sont faits discrets pour développer la V2. La V1
+était mal codée, ce qui fait que même avec la clé de décryptage, certaines
+données seront perdues, car corrompues. Le responsable de l’attaque n’a pas
+l’air français, mais francophone, il a analysé le système cible, consulté des
+factures, etc. Il demande 3900€ de rançon pour les données. Le patron à proposé
+150 max, le pirate à proposer 1500, puis la conversation s’est arrêté la. </p>
+
+<p class=MsoNormal style='text-align:justify'>Je suis allé dans la boite accompagnée
+de mon père pour&nbsp;: remettre le poste de travail en fonctionnement et sécuriser
+l’infrastructure.</p>
+
+<p class=MsoNormal style='text-align:justify'>&nbsp;</p>
+
+<p class=MsoNormal style='text-align:justify'>En premier lieu, nous avons
+analysé la situation. Il y avait 5 ordinateurs dans la boite, 1 vérolé et inutilisable,
+les autres étaient éteints/hors-ligne lors de l’attaque donc ils n’étaient
+probablement pas infectés. On a tout de même vérifié qu’il n’y avait aucune
+trace de cryptage quelconque.<br>
+La plupart des ordinateurs n’avaient pas de mot de passe et n’avaient qu’un
+seul profil Windows, administrateur. <br>
+<br>
+La première étape fut de réfléchir à une solution pour sécuriser les appareils.
+La solution la plus simple pour la boite était un gestionnaire de mot de passe
+commun aux 5 employés de bureau pour avoir des mots de passe fort sans les
+noter/oublier. Puis mettre en place un profil utilisateur pour le travail
+quotidien, puis un profil administrateur pour les manipulations éventuelles.</p>
+
+<p class=MsoNormal style='text-align:justify'>Dans l’ordre&nbsp;:</p>
+
+<p class=MsoListParagraphCxSpFirst style='text-align:justify;text-indent:-18.0pt'>-<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span>Création d’une adresse Gmail spécialement dédiée à la sécurité de la
+boite</p>
+
+<p class=MsoListParagraphCxSpMiddle style='text-align:justify;text-indent:-18.0pt'>-<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span>Création d’un mot de passe fort, que toute l’équipe pourra utiliser,
+pour déverrouiller le coffre-fort BitWarden.</p>
+
+<p class=MsoListParagraphCxSpMiddle style='text-align:justify;text-indent:-18.0pt'>-<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span>Création d’un compte «&nbsp;BitWarden&nbsp;».</p>
+
+<p class=MsoListParagraphCxSpMiddle style='text-align:justify;text-indent:-18.0pt'>-<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span>Installation de BitWarden sur le bureau + dans le navigateur web</p>
+
+<p class=MsoListParagraphCxSpMiddle style='text-align:justify;text-indent:-18.0pt'>-<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span>Création d’un compte administrateur puis restrictions des droits du
+profil utilisateur</p>
+
+<p class=MsoListParagraphCxSpLast style='text-align:justify'>&nbsp;</p>
+
+<p class=MsoNormal style='text-align:justify'>Puis il a fallu mettre en place
+le système de double compte puis le gestionnaire de mot de passe sur 3 autres
+ordinateurs.</p>
+
+<p class=MsoNormal style='text-align:justify'>Ensuite, j’ai commencé à monter
+une image Windows sur une clé USB avec Rufus pour le réinstaller sur le PC
+vérolé. Les disques durs infectés ont été emportés pour une analyse poussée par
+mon père (Expert Forensique).            <br>
+<br>
+Pendant l’installation de Windows sur la clé, j’ai fait des infographies et des
+guides de bonne utilisation et conseils pour BitWarden. Pour que la boite
+puisse effectuer une transition efficace, sans être constamment bloquée par une
+technologie nouvelle. Puis j’ai expliqué au patron comment tout ça allait
+fonctionner, comment se servir du gestionnaire de mot de passe, mes astuces
+personnelles, puis il a manipulé un peu pour se familiariser avec l’outil.   <br>
+<br>
+J’ai ensuite récupéré tous les mots de passe stockés dans les navigateurs
+(Chrome &amp; Edge), je les ai exporté puis importé dans BitWarden, puis supprimé
+des navigateurs en désactivant l’option d’enregistrement des mots de passe.</p>
+
+<p class=MsoNormal style='text-align:justify'>&nbsp;</p>
+
+<p class=MsoNormal style='text-align:justify'>Ensuite, la clé bootable était
+prête, on a réinstallé un disque SSD 128 Go + un disque mécanique de 4 TO. En
+branchant la clé, désactivant le secure boot dans le bios et bootant sur la
+clé, le PC démarrait directement sous Windows. Mais il y avait des fichiers Windows
+sur le disque SSD qui venait d’être acheté. On a pensé que Windows a fait une
+«&nbsp;pré-installation&nbsp;» sur le SSD pour «&nbsp;tester&nbsp;» Windows
+sans l’installer, puis c’était simplement que Windows est parfois préinstallé
+sur des disques SSD que l’on achète.               <br>
+<br>
+Suite à l’installation de Windows, il a fallu remettre les applications de
+travail du patron, reconnecter l’imprimante, mettre en place les doubles
+comptes et installer BitWarden.</p>
+
+<p class=MsoNormal style='text-align:justify'>Et la touche finale, imprimer les
+infographies / guide puis les déposer sur les bureaux des employés.<br>
+<br>
+La journée aura fait 10H30-12H30, 13H30-19H30, et le patron nous remerciera en
+me payant une chaise de Bureau pour mon nouvel appartement. </p>
+
+</div>
+
+</body>
+
+</html>

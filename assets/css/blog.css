@@ -1,0 +1,8 @@
+.liste-rond {
+    list-style: outside;
+    margin-left:5em;
+}
+.liste-carre{
+    list-style: square outside;
+    margin-left: 5em;
+}

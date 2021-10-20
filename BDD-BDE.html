@@ -1,0 +1,314 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta name="description" content="Mon CV/Portfolio">
+  <meta name="author" content="Loïc Récoupé">
+  <title>CV/PortFolio - Loïc Récoupé</title>
+  <link rel="stylesheet" href="assets/css/color.css">
+  <link rel="stylesheet" href="assets/css/blog.css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto|Roboto+Mono|Inconsolata" rel="stylesheet">
+  <link href="https://cdn.materialdesignicons.com/2.0.46/css/materialdesignicons.min.css" rel="stylesheet">
+  <link rel="icon" href="assets/img/logo.png" type="image/icon type">
+
+</head>
+<body>
+
+<!--Switcher-->
+  <div class="style-switcher">
+    <span class="style-switcher__control"></span>
+    <div class="style-switcher__list">
+      <a class="style-switcher__link style-switcher__link--color"></a>
+      <a class="style-switcher__link style-switcher__link--mono"></a>
+    </div>
+  </div>
+<!--Switcher-->
+ <!--Main menu-->
+    <div class="menu">
+        <div class="container">
+            <div class="row">
+                <div class="menu__wrapper d-none d-lg-block col-md-12">
+                    <nav class="">
+                        <ul>
+                            <li><a href="index.html">Accueil</a></li>
+                            <li><a href="#contact">Contact</a></li>
+                        </ul>
+                    </nav>
+                </div>
+                <div class="menu__wrapper col-md-12 d-lg-none">
+                    <div class="menu__mobile-button">
+                        <span><i class="fa fa-bars" aria-hidden="true"></i></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--Main menu-->
+
+    <!-- Mobile menu -->
+    <div class="mobile-menu d-lg-none">
+        <div class="container">
+            <div class="mobile-menu__close">
+                <span><i class="mdi mdi-close" aria-hidden="true"></i></span>
+            </div>
+            <nav class="mobile-menu__wrapper">
+                <ul>
+                    <li><a href="index.html">Accueil</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+    <!-- Mobile menu -->
+
+    <!--Header-->
+    <header class="background blog-header" style="background-image: url(assets/img/img_bg_main.jpg)">
+    </header>
+    <!--Header-->
+
+    <!--Article-->
+    <div class="container">
+        <div class="article">
+            <div class="row">
+                <div class="col-md-12">
+                    <a class="article__back-link" href="index.html"><i class="fa fa-long-arrow-left" aria-hidden="true"></i>Retour</a>
+                    <p class="article__title">Création d'un système de vente automatisé pour mon BDE (Bureau des étudiants)</p>
+                    <p class="article_date">12 Octobre 2021</p>
+                    <p class="align-items-end">
+Mettre en place un Raspberry qui envoie des requêtes SQL vers une base de données avec une douchette pour les ventes de snacks du BDE
+</p>
+<p>
+Pour le moment, les ventes de snacks sont comptabilisé dans un GSheet. Pour chaque produit vendu, il faut ouvrir un PC, se connecter au drive, aller sur le document, et remplir manuellement la bonne colonne. C’est long et fastidieux, et très contraignant pour les pauses de 5 minutes ou ça doit aller vite.
+On se retrouve donc à noter ça sur papier en vitesse et à régulariser le soir.
+</p>
+<p>
+Il fallait une solution. J’ai trouvé un vieux raspberry dans le local, avec une douchette (qui scanne les codes-barres).
+L’idée serait d’avoir une feuille collé au bureau de vente, avec un code barre pour chaque produit, et il suffirait de scanner le code bar « kinder country » pour ajouter un kinder country dans la table « ventes » d’une BDD. Il suffira juste de brancher le raspberry, prendre la douchette, et scanner, ce qui est bien plus rapide et pratique.
+</p>
+<p>
+
+Voici le plan :
+<ul class="liste-rond">
+  <li><span>
+      Installer une distribution linux ultra-portable
+  </span></li>
+  <li><span>
+      Installer Python3 et SQLite
+  </span></li>
+  <li><span>
+      Initialiser une BDD relationnelle (trouver les tables que je vais faire, les liens entre elles, etc…)
+  </span></li>
+  <li><span>
+      Faire un code barre pour chaque snack/boisson
+  </span></li>
+  <li><span>
+      Faire un script python qui prendra en entrée un code barre (un nombre donc) scanné et qui enverra une requête SQL en conséquence (on scanne le code-barre « kit-kat », ça envoie une requête SQL qui rajoute un kit-kat dans la table « ventes ».
+  </span></li>
+  <li><span>
+      Lancer le script python à chaque allumage du raspberry
+  </span></li>
+</ul>
+</p>
+<p>
+1)  A) Installation de Raspbian :
+<br><br>
+J’ai trouvé un adaptateur microSd USB, un clavier filaire, une souris, un cable micro-usb, et un adaptateur VGAHDMI. 
+J’ai installé Raspbian avec Raspberry PI Imager. Au moment ou j’écris ces lignes, l’OS se met à jour. Je pourrais ensuite installer Python et le module SQLite3 pour gérer la BDD.
+</p>
+<p>
+2)  Installation de Python3 et SQlite3 :
+Ce n’était en réalité pas nécessaire, python3 était installé avec Raspbian, et SQLite3 est installé de base avec python.
+</p>
+<p>
+3)  A) Installation d’une LED externe :
+<br><br>
+En réfléchissant à la structure de la BDD, j’ai fais face à un soucis :
+Je compte faire une table Produit, avec un identifiant pour chaque produit, un nom et un prix.
+Or, il y a 2 prix, les prix adhérents, et les prix non-adhérents. Comment, en scannant un code barre, le script fera la différence ? Il ne pourra pas. Il est hors de question de doubler le nombre de code barre.
+Je vais alors rajouter un code barre, qui quand on le scanne, va changer d’état un booléen « Adhérant ». Ce qui permet de passer en mode « adhérant » et « non-adhérant » en scannant simplement un code-barre. Chaque produit dans la table aura son prix adhérant et son prix non-adhérant.
+Il faut maintenant trouver un moyen d’indiquer dans quel état on est, pour éviter toute confusion.
+Il n’y a pas de système sonore sur la raspberry. Il y a des leds intégré, dont la verte qui est contrôlable. Cependant, elle est trop peu visible pour que ça soit utile dans ma situation.
+Il faut donc :
+<ul class="liste-rond">
+  <li><span class="marge">Prendre une LED</span></li>
+  <li><span class="marge">Souder une résistance sur la LED</span></li>
+  <li><span class="marge">Brancher un câble Dupont sur les GPIO puis souder la led sur l’autre extrémité du câble</span></li>
+  <li><span class="marge">Faire un trou dans le boitier et y placer la LED pour qu’elle soit visible de l’extérieur</span></li>
+</ul>
+</p>
+
+  <p>B) Création de la BDD, j’ai fais 4 tables :
+                    <ul class="liste-rond">
+                        <li><span class="marge">Produits, avec ID, Nom, Prix_Adherants, Prix_nonAdherants, Stock</span></li>
+                        <li><span class="marge">Ventes, avec Date, produit (id), Adhérant (bool)</span></li>
+                        <li><span class="marge">VentesCopy, un backup de Ventes en lecture seule</span></li>
+                        <li><span class="marge">AchatsRestock avec Date, Produit, Quantitée, PrixTotal.</span></li>
+                    </ul>
+  </p>
+<p>
+4)  Faire un code barre pour chaque snack/boisson :
+Je n’ai pas d’imprimante, et le code barre ne fonctionne que sur papier, je vais donc utiliser temporairement un code barre de produit random se trouvant dans ma chambre. J’utiliserais ce site pour faire les codes barre : https://barcode.tec-it.com/fr/?data=Coca
+</p>
+<p>
+5)  Faire le script python qui gérera tout ça :
+Le script prendra en entrée un code barre (Nom Produit).
+Il devra faire des requêtes SQL en conséquences pour mettre à jour correctement la BDD.
+Il devra aussi gérer la led indiquant si on est en mode « Adhérant » ou non.
+
+J’ai donc fait 6 scripts.
+<ul class="liste-rond">
+  <li>1)  Un script avec une fonction qui allume la led ou l’éteint en fonction d’un booléen qu’on lui fournit.</li>
+  <li>2)  Un script qui permet d’afficher l’historique des restocks, et d’ajouter une entrée dans la table.</li>
+  <li>3)  Un script qui permet d’afficher les produits en ventes, d’en ajouter un, d’en supprimer un ou d’en modifier un.</li>
+  <li>4)  Un script qui permet d’afficher les ventes effectuée, et afficher la table copie des ventes (avec les annulations)</li>
+  <li>5)  Et le script final, celui qui gère les entrée de ventes :</li>
+                    <ul class="liste-carre">
+                          <li>a.  Il n’est pas bien compliqué, il établit en premier lieu la connection avec la BDD, met le bool « adhérants » à vrai (car on a bcp + de    ventes à des adhérants que non adhérants, c’est plus pratique qu’il soit directement dans ce mode) et allume la LED.</span></li>
+                          <li>b.  Ensuite, un « While True » attend pour un INPUT, il vérifie si c’est un code spécial.</li>
+                          <li>Si c’est « ANNULER », il récupère la dernière entrée des « ventes » et la supprime.</li>
+                          <li>Si c’est « MODEADH » il change juste d’état le booléen et actualise la LED en fonction.</li>
+                          <li>c.  Si ce n’est pas un des deux, il envoie une requête SQL qui ajoute dans ventes et ventesCopy une entrée du produit scanné, en mettant son prix (adhérant ou nonAdhérants), la date du jour, si ça à été vendu à un adhérant ou non.</span></li>
+                    </ul>
+</ul>
+  <span class="marge">Et il recommence cette boucle indéfiniment, en attendant les inputs.</span>
+
+</p>
+<p>
+J’étais censé initialement rendre cette installation « headless », on aurait pas eu besoin d’écran ou de clavier. Juste brancher la raspberry, la douchette, et scanner les produits lors des ventes. Mais après avoir cherché des heures, impossible de lancer le script python dans un terminal visible au démarrage.
+</p>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--Article-->
+
+    <!--Other Posts
+    <section id="posts" class="container section">
+        <div class="row">
+            <div class="col-md-12">
+                <h2  id="other_posts" class="section__title">Other Posts_</h2>
+            </div>
+        </div>
+
+        <div class="row posts">
+            <div class="col-md-5 mr-auto">
+                <div class="posts__item">
+                    <a href="">
+                        <h3 class="posts__title">What’s new in the IT Industry?</h3>
+                        <p class="posts__description">Invitation excellence imprudence understood it continuing to.
+                            Ye show done an into.</p>
+                    </a>
+                </div>
+                <div class="posts__item">
+                    <a href="">
+                        <h3 class="posts__title">How I organize my work with code</h3>
+                        <p class="posts__description">Invitation excellence imprudence understood it continuing to.
+                            Ye show done an into.</p>
+                    </a>
+                </div>
+                <div class="posts__item">
+                    <a href="">
+                        <h3 class="posts__title">How to use css-preprocessor</h3>
+                        <p class="posts__description">Invitation excellence imprudence understood it continuing to.
+                            Ye show done an into.</p>
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-5 mr-auto">
+                <div class="posts__item">
+                    <a href="">
+                        <h3 class="posts__title">What’s new in the IT Industry?</h3>
+                        <p class="posts__description">Invitation excellence imprudence understood it continuing to.
+                            Ye show done an into.</p>
+                    </a>
+                </div>
+                <div class="posts__item">
+                    <a href="">
+                        <h3 class="posts__title">How I organize my work with code</h3>
+                        <p class="posts__description">Invitation excellence imprudence understood it continuing to.
+                            Ye show done an into.</p>
+                    </a>
+                </div>
+                <div class="posts__item">
+                    <a href="">
+                        <h3 class="posts__title">How to use css-preprocessor</h3>
+                        <p class="posts__description">Invitation excellence imprudence understood it continuing to.
+                            Ye show done an into.</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+    Other Posts-->
+
+ <!--Contact-->
+  <div class="background" style="background-image: url(assets/img/img_bg_main.webp)">
+    <div id="contact" class="container section">
+      <div class="row">
+        <div class="col-md-12">
+          <p id="contacts_header" class="section__title">Me contacter</p>
+        </div>
+      </div>
+      <div class="row contacts">
+        <div class="col-md-5 col-lg-4">
+          <div class="contacts__list">
+            <dl class="contact-list">
+              <dt>Téléphone:</dt>
+              <dd><a href="tel:+33629607873">06 29 60 78 73</a></dd>
+              <dt>Email:</dt>
+              <dd><a href="mailto:loic.recoupe@gmail.com">loic.recoupe@gmail.com</a></dd>
+            </dl>
+          </div>
+          <div class="contacts__social">
+            <ul>
+              <li><a href="https://www.linkedin.com/in/loic-recoupe/">Linkedin</a></li>
+              <li><a href="https://github.com/LoicRcp">GitHub</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-7 col-lg-5">
+          <div class="contacts__form">
+            <p class="contacts__form-title">Ou envoyez moi directement un mail (Ne fonctionne pas encore)</p>
+            <form class="js-form">
+              <div class="form-group">
+                <input class="form-field js-field-name" type="text" placeholder="Votre nom" required>
+                <span class="form-validation"></span>
+                <span class="form-invalid-icon"><i class="mdi mdi-close" aria-hidden="true"></i></span>
+              </div>
+              <div class="form-group">
+                <input class="form-field js-field-email" type="email"  placeholder="Votre e-mail" required>
+                <span class="form-validation"></span>
+                <span class="form-invalid-icon"><i class="mdi mdi-close" aria-hidden="true"></i></span>
+              </div>
+              <div class="form-group">
+                <textarea class="form-field js-field-message" placeholder="Écrivez votre message ici..." required></textarea>
+                <span class="form-validation"></span>
+                <span class="form-invalid-icon"><i class="mdi mdi-close" aria-hidden="true"></i></span>
+              </div>
+              <button class="site-btn site-btn--form" type="submit" value="Send">Envoyer</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<!--Contact-->
+
+    <script src="assets/js/jquery-2.2.4.min.js"></script>
+    <script src="assets/js/popper.min.js"></script>
+    <script src="assets/js/bootstrap.min.js"></script>
+    <script src="assets/js/menu.js"></script>
+    <script src="assets/js/jquery.waypoints.js"></script>
+    <script src="assets/js/progress-list.js"></script>
+    <script src="assets/js/section.js"></script>
+    <script src="assets/js/mobile-menu.js"></script>
+    <script src="assets/js/contacts.js"></script>
+    <script src="assets/js/mbclicker.min.js"></script>
+    <script src="assets/js/site-btn.js"></script>
+    <script src="assets/js/style-switcher.js"></script>
+</body>
+</html>
