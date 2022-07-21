@@ -50,5 +50,8 @@ var animatedHeaders = animateHeaders({
     "#testimonials_header": '70%',
     "#blog_header": '70%',
     "#contacts_header": '70%',
-    "#other_posts": '70%'
+    "#other_posts": '70%',
+    "#proj-freelance-header": '70%',
+    "#proj-pro-header": '70%',
+    "#proj-perso-header": '70%'
 });
