@@ -7,11 +7,14 @@ const Scene = () => {
     const rendererRef = useRef(null);
     const sceneRef = useRef(null);
     const cameraRef = useRef(null);
+    const geometryRef = useRef(null);
+    const materialRef = useRef(null);
 
     useEffect(() => {
         // Initialisation de la scène
         const scene = new THREE.Scene();
         sceneRef.current = scene;
+        scene.background = new THREE.Color(0x000000);
 
         // Configuration de la caméra
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -20,7 +23,14 @@ const Scene = () => {
 
         // Ajout d'un cube pour test
         const geometry = new THREE.BoxGeometry();
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+        const material = new THREE.MeshBasicMaterial({ 
+            color: 0xffffff, 
+            wireframe: true 
+        });
+        
+        geometryRef.current = geometry;
+        materialRef.current = material;
+        
         const cube = new THREE.Mesh(geometry, material);
         scene.add(cube);
 
@@ -36,8 +46,9 @@ const Scene = () => {
         renderer.init(scene, camera);
 
         // Animation loop
+        let frameId;
         const animate = () => {
-            requestAnimationFrame(animate);
+            frameId = requestAnimationFrame(animate);
             animateCube();
             renderer.render();
         };
@@ -56,7 +67,23 @@ const Scene = () => {
         // Cleanup
         return () => {
             window.removeEventListener('resize', handleResize);
-            // Cleanup Three.js resources...
+            cancelAnimationFrame(frameId);
+            
+            // Cleanup Three.js resources
+            if (geometryRef.current) {
+                geometryRef.current.dispose();
+            }
+            if (materialRef.current) {
+                materialRef.current.dispose();
+            }
+            if (rendererRef.current) {
+                rendererRef.current.dispose();
+            }
+            
+            // Vider la scène
+            while(scene.children.length > 0) { 
+                scene.remove(scene.children[0]); 
+            }
         };
     }, []);
 

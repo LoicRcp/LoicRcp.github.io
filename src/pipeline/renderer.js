@@ -8,21 +8,37 @@ export class Renderer {
     constructor(canvas) {
         this.renderer = new THREE.WebGLRenderer({
             canvas: canvas,
-            antialias: true
+            antialias: true,
+            powerPreference: "high-performance"
         });
         
         this.composer = null;
         this.renderScene = null;
         this.testPass = null;
+        this.renderTarget = null;
     }
 
     init(scene, camera) {
         // Configuration du renderer
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
 
-        // Création du composer et des passes
-        this.composer = new EffectComposer(this.renderer);
+        // Création du render target optimisé
+        this.renderTarget = new THREE.WebGLRenderTarget(
+            window.innerWidth,
+            window.innerHeight,
+            {
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat,
+                encoding: THREE.sRGBEncoding,
+                samples: 0 // Désactive le MSAA pour de meilleures performances
+            }
+        );
+        
+        // Création du composer avec le render target optimisé
+        this.composer = new EffectComposer(this.renderer, this.renderTarget);
         
         // Passe de rendu de base
         this.renderScene = new RenderPass(scene, camera);
@@ -49,8 +65,23 @@ export class Renderer {
 
     setSize(width, height) {
         this.renderer.setSize(width, height);
+        if (this.renderTarget) {
+            this.renderTarget.setSize(width, height);
+        }
         if (this.composer) {
             this.composer.setSize(width, height);
         }
+    }
+
+    dispose() {
+        // Nettoyage des ressources
+        if (this.renderTarget) {
+            this.renderTarget.dispose();
+        }
+        if (this.composer) {
+            this.composer.renderTarget1.dispose();
+            this.composer.renderTarget2.dispose();
+        }
+        this.renderer.dispose();
     }
 }
