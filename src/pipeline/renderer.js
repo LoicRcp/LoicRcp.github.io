@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { testVertexShader, testFragmentShader } from '../shaders/shaders';
+import { baseVertexShader, luminanceFragmentShader } from '../shaders/shaders';
 
 export class Renderer {
     constructor(canvas) {
@@ -14,7 +14,7 @@ export class Renderer {
         
         this.composer = null;
         this.renderScene = null;
-        this.testPass = null;
+        this.luminancePass = null;
         this.renderTarget = null;
     }
 
@@ -44,17 +44,25 @@ export class Renderer {
         this.renderScene = new RenderPass(scene, camera);
         this.composer.addPass(this.renderScene);
 
-        // Passe de test (carré vert)
-        const testShader = {
+        // Passe de luminance
+        const luminanceShader = {
             uniforms: {
-                tDiffuse: { value: null }
+                tDiffuse: { value: null },
+                luminanceBase: { value: 0.05 }  // Valeur de base ajustable
             },
-            vertexShader: testVertexShader,
-            fragmentShader: testFragmentShader
+            vertexShader: baseVertexShader,
+            fragmentShader: luminanceFragmentShader
         };
         
-        this.testPass = new ShaderPass(testShader);
-        this.composer.addPass(this.testPass);
+        this.luminancePass = new ShaderPass(luminanceShader);
+        this.composer.addPass(this.luminancePass);
+    }
+
+    // Permet d'ajuster la luminance depuis l'extérieur
+    setLuminance(value) {
+        if (this.luminancePass) {
+            this.luminancePass.uniforms.luminanceBase.value = value;
+        }
     }
 
     render() {

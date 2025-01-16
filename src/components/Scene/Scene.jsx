@@ -44,6 +44,7 @@ const Scene = () => {
         const renderer = new Renderer(canvasRef.current);
         rendererRef.current = renderer;
         renderer.init(scene, camera);
+        renderer.setLuminance(0.1)
 
         // Animation loop
         let frameId;
