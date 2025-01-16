@@ -6,7 +6,8 @@ import {
     baseVertexShader, 
     luminanceFragmentShader,
     crtDistortionFragmentShader,
-    chromaticAberrationFragmentShader
+    chromaticAberrationFragmentShader,
+    scanlinesFragmentShader
 } from '../shaders/shaders';
 
 export class Renderer {
@@ -22,7 +23,9 @@ export class Renderer {
         this.luminancePass = null;
         this.distortionPass = null;
         this.chromaticAberrationPass = null;
+        this.scanlinesPass = null;
         this.renderTarget = null;
+        this.clock = new THREE.Clock();
     }
 
     init(scene, camera) {
@@ -82,13 +85,31 @@ export class Renderer {
         const chromaticAberrationShader = {
             uniforms: {
                 tDiffuse: { value: null },
-                aberrationIntensity: { value: 1.0 }
+                aberrationIntensity: { value: 3.0 }
             },
             vertexShader: baseVertexShader,
             fragmentShader: chromaticAberrationFragmentShader
         };
         this.chromaticAberrationPass = new ShaderPass(chromaticAberrationShader);
         this.composer.addPass(this.chromaticAberrationPass);
+
+        // Passe des scanlines
+        const scanlinesShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                time: { value: 0.0 },
+                resolution: { 
+                    value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
+                },
+                scanlineIntensity: { value: 0.3 },
+                scanlineCount: { value: 100.0 },
+                scanlineSpeed: { value: 2.0 }
+            },
+            vertexShader: baseVertexShader,
+            fragmentShader: scanlinesFragmentShader
+        };
+        this.scanlinesPass = new ShaderPass(scanlinesShader);
+        this.composer.addPass(this.scanlinesPass);
     }
 
     setLuminance(value) {
@@ -109,8 +130,26 @@ export class Renderer {
         }
     }
 
+    setScanlines(intensity, count, speed) {
+        if (this.scanlinesPass) {
+            if (intensity !== undefined) {
+                this.scanlinesPass.uniforms.scanlineIntensity.value = intensity;
+            }
+            if (count !== undefined) {
+                this.scanlinesPass.uniforms.scanlineCount.value = count;
+            }
+            if (speed !== undefined) {
+                this.scanlinesPass.uniforms.scanlineSpeed.value = speed;
+            }
+        }
+    }
+
     render() {
         if (this.composer) {
+            // Mise à jour du temps pour l'animation des scanlines
+            if (this.scanlinesPass) {
+                this.scanlinesPass.uniforms.time.value = this.clock.getElapsedTime();
+            }
             this.composer.render();
         }
     }
@@ -123,8 +162,12 @@ export class Renderer {
         if (this.composer) {
             this.composer.setSize(width, height);
         }
+        const resolution = new THREE.Vector2(width, height);
         if (this.distortionPass) {
-            this.distortionPass.uniforms.resolution.value.set(width, height);
+            this.distortionPass.uniforms.resolution.value.copy(resolution);
+        }
+        if (this.scanlinesPass) {
+            this.scanlinesPass.uniforms.resolution.value.copy(resolution);
         }
     }
 

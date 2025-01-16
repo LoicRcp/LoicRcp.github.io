@@ -56,23 +56,18 @@ export const chromaticAberrationFragmentShader = `
     varying vec2 vUv;
 
     void main() {
-        // Centre les coordonnées UV
         vec2 center = vec2(0.5);
         vec2 coord = vUv - center;
         
-        // Calcule la distance et la direction normalisée depuis le centre
         float dist = length(coord);
         vec2 direction = dist > 0.0 ? coord / dist : vec2(0.0);
         
-        // Calcule les offsets proportionnels à la distance, dans la direction du centre
         float redOffset = aberrationIntensity * 0.004;
         float blueOffset = aberrationIntensity * -0.004;
         
-        // Échantillonne chaque canal avec son offset radial
         vec2 redUV = vUv + direction * redOffset * dist;
         vec2 blueUV = vUv + direction * blueOffset * dist;
         
-        // Assure que les UVs restent dans les limites
         vec2 greenUV = vUv;
         
         float r = texture2D(tDiffuse, redUV).r;
@@ -80,5 +75,47 @@ export const chromaticAberrationFragmentShader = `
         float b = texture2D(tDiffuse, blueUV).b;
         
         gl_FragColor = vec4(r, g, b, 1.0);
+    }
+`;
+
+// Shader des scanlines
+export const scanlinesFragmentShader = `
+    uniform sampler2D tDiffuse;
+    uniform float time;
+    uniform vec2 resolution;
+    uniform float scanlineIntensity;  // Intensité des lignes
+    uniform float scanlineCount;      // Nombre de lignes
+    uniform float scanlineSpeed;      // Vitesse de défilement
+    varying vec2 vUv;
+
+    // Fonction de bruit pseudo-aléatoire
+    float rand(float n) {
+        return fract(sin(n) * 43758.5453123);
+    }
+
+    void main() {
+        // Paramètres de base des scanlines
+        float scanlines = scanlineCount * (resolution.y / 1080.0); // Adapte à la résolution
+        
+        // Calcul de la position des scanlines avec défilement
+        float scanlinePos = vUv.y * scanlines + time * scanlineSpeed;
+        
+        // Motif de base des scanlines
+        float scanlinePattern = sin(scanlinePos * 3.1415926535897932384626433832795);
+        
+        // Ajout d'une variation aléatoire pour le scintillement
+        float flickering = mix(1.0, rand(time * 0.01), 0.05);
+        
+        // Calcul de l'intensité finale des scanlines
+        float scanlineEffect = 1.0 - (scanlinePattern * scanlinePattern * scanlineIntensity * flickering);
+        
+        // Application de la variation de luminosité
+        vec4 texel = texture2D(tDiffuse, vUv);
+        vec3 color = texel.rgb * scanlineEffect;
+        
+        // Boost légèrement la luminosité des lignes claires pour compenser l'assombrissement
+        color *= 1.0 + (1.0 - scanlineEffect) * 0.2;
+        
+        gl_FragColor = vec4(color, texel.a);
     }
 `;

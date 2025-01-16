@@ -47,6 +47,8 @@ const Scene = () => {
         renderer.setLuminance(0.1)
         renderer.setDistortion(0.05)
         renderer.setAberration(3)
+        renderer.setScanlines(0.3, 100, 2.0);
+
 
         // Animation loop
         let frameId;
