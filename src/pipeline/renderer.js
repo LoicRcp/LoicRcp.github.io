@@ -5,7 +5,8 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { 
     baseVertexShader, 
     luminanceFragmentShader,
-    crtDistortionFragmentShader 
+    crtDistortionFragmentShader,
+    chromaticAberrationFragmentShader
 } from '../shaders/shaders';
 
 export class Renderer {
@@ -20,6 +21,7 @@ export class Renderer {
         this.renderScene = null;
         this.luminancePass = null;
         this.distortionPass = null;
+        this.chromaticAberrationPass = null;
         this.renderTarget = null;
     }
 
@@ -38,7 +40,7 @@ export class Renderer {
                 magFilter: THREE.LinearFilter,
                 format: THREE.RGBAFormat,
                 encoding: THREE.sRGBEncoding,
-                samples: 0 // Désactive le MSAA pour de meilleures performances
+                samples: 0
             }
         );
         
@@ -58,7 +60,6 @@ export class Renderer {
             vertexShader: baseVertexShader,
             fragmentShader: luminanceFragmentShader
         };
-        
         this.luminancePass = new ShaderPass(luminanceShader);
         this.composer.addPass(this.luminancePass);
 
@@ -74,22 +75,37 @@ export class Renderer {
             vertexShader: baseVertexShader,
             fragmentShader: crtDistortionFragmentShader
         };
-        
         this.distortionPass = new ShaderPass(distortionShader);
         this.composer.addPass(this.distortionPass);
+
+        // Passe d'aberration chromatique
+        const chromaticAberrationShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                aberrationIntensity: { value: 1.0 }
+            },
+            vertexShader: baseVertexShader,
+            fragmentShader: chromaticAberrationFragmentShader
+        };
+        this.chromaticAberrationPass = new ShaderPass(chromaticAberrationShader);
+        this.composer.addPass(this.chromaticAberrationPass);
     }
 
-    // Permet d'ajuster la luminance depuis l'extérieur
     setLuminance(value) {
         if (this.luminancePass) {
             this.luminancePass.uniforms.luminanceBase.value = value;
         }
     }
 
-    // Permet d'ajuster la distortion depuis l'extérieur
     setDistortion(value) {
         if (this.distortionPass) {
             this.distortionPass.uniforms.distortionIntensity.value = value;
+        }
+    }
+
+    setAberration(value) {
+        if (this.chromaticAberrationPass) {
+            this.chromaticAberrationPass.uniforms.aberrationIntensity.value = value;
         }
     }
 
@@ -107,14 +123,12 @@ export class Renderer {
         if (this.composer) {
             this.composer.setSize(width, height);
         }
-        // Met à jour la résolution pour la distortion
         if (this.distortionPass) {
             this.distortionPass.uniforms.resolution.value.set(width, height);
         }
     }
 
     dispose() {
-        // Nettoyage des ressources
         if (this.renderTarget) {
             this.renderTarget.dispose();
         }
