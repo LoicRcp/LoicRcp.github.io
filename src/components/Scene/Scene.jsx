@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import Stats from 'three/examples/jsm/libs/stats.module';
 import { Renderer } from '../../pipeline/renderer';
 
 const Scene = () => {
@@ -9,8 +10,18 @@ const Scene = () => {
     const cameraRef = useRef(null);
     const geometryRef = useRef(null);
     const materialRef = useRef(null);
+    const statsRef = useRef(null);
 
     useEffect(() => {
+        // Initialisation des stats
+        const stats = new Stats();
+        stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+        stats.dom.style.position = 'absolute';
+        stats.dom.style.right = '0px';  // Placé à droite au lieu de gauche
+        stats.dom.style.top = '0px';
+        document.body.appendChild(stats.dom);
+        statsRef.current = stats;
+
         // Initialisation de la scène
         const scene = new THREE.Scene();
         sceneRef.current = scene;
@@ -54,8 +65,15 @@ const Scene = () => {
         let frameId;
         const animate = () => {
             frameId = requestAnimationFrame(animate);
+            
+            // Début de la mesure
+            stats.begin();
+            
             animateCube();
             renderer.render();
+            
+            // Fin de la mesure
+            stats.end();
         };
         animate();
 
@@ -73,6 +91,11 @@ const Scene = () => {
         return () => {
             window.removeEventListener('resize', handleResize);
             cancelAnimationFrame(frameId);
+            
+            // Retirer les stats
+            if (statsRef.current) {
+                document.body.removeChild(statsRef.current.dom);
+            }
             
             // Cleanup Three.js resources
             if (geometryRef.current) {

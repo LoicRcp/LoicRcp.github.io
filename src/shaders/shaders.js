@@ -127,15 +127,15 @@ export const glowHorizontalFragmentShader = `
     uniform vec2 resolution;
     varying vec2 vUv;
 
-    // Poids gaussiens pour 5 échantillons
-    const float weights[5] = float[5](0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+    // Poids gaussiens pour 3 échantillons
+    const float weights[3] = float[3](0.4026, 0.2442, 0.0545);
 
     void main() {
         vec2 texel = vec2(1.0 / resolution.x, 1.0 / resolution.y);
         vec3 result = texture2D(tDiffuse, vUv).rgb * weights[0];
         
         // Échantillonnage horizontal
-        for(int i = 1; i < 5; i++) {
+        for(int i = 1; i < 3; i++) {
             vec2 offset = vec2(texel.x * float(i) * glowRadius, 0.0);
             result += texture2D(tDiffuse, vUv + offset).rgb * weights[i];
             result += texture2D(tDiffuse, vUv - offset).rgb * weights[i];
@@ -156,7 +156,7 @@ export const glowVerticalFragmentShader = `
     varying vec2 vUv;
 
     // Poids gaussiens pour 5 échantillons
-    const float weights[5] = float[5](0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+    const float weights[3] = float[3](0.4026, 0.2442, 0.0545);
 
     // Fonction pour ajuster la persistence selon la couleur
     // Les phosphores réels ont des taux de décroissance différents selon la couleur
@@ -173,7 +173,7 @@ export const glowVerticalFragmentShader = `
         vec3 result = texture2D(tDiffuse, vUv).rgb * weights[0];
         
         // Échantillonnage vertical
-        for(int i = 1; i < 5; i++) {
+        for(int i = 1; i < 3; i++) {
             vec2 offset = vec2(0.0, texel.y * float(i) * glowRadius);
             result += texture2D(tDiffuse, vUv + offset).rgb * weights[i];
             result += texture2D(tDiffuse, vUv - offset).rgb * weights[i];

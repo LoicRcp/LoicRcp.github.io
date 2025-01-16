@@ -35,6 +35,15 @@ export class Renderer {
         // Pour le ping-pong de la persistence
         this.persistenceTargets = [null, null];
         this.currentPersistenceTarget = 0;
+
+        this.pingPongQuad = new THREE.Mesh(
+            new THREE.PlaneGeometry(2, 2),
+            new THREE.MeshBasicMaterial({ transparent: true })
+        );
+        this.pingPongQuad.frustumCulled = false;
+        this.pingPongCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
+        this.pingPongScene = new THREE.Scene();
+        this.pingPongScene.add(this.pingPongQuad);
     }
 
     init(scene, camera) {
@@ -45,11 +54,13 @@ export class Renderer {
 
         // Création des render targets
         const targetOptions = {
-            minFilter: THREE.LinearFilter,
+            minFilter: THREE.NearestFilter,
             magFilter: THREE.LinearFilter,
-            format: THREE.RGBAFormat,
+            format: THREE.RGBFormat,
             encoding: THREE.sRGBEncoding,
-            samples: 0
+            samples: 0,
+            width: window.innerWidth * 0.5,
+            height: window.innerHeight * 0.5
         };
 
         this.renderTarget = new THREE.WebGLRenderTarget(
@@ -235,30 +246,16 @@ export class Renderer {
             // Copie du résultat dans le prochain target de persistence
             this.renderer.setRenderTarget(this.persistenceTargets[1 - this.currentPersistenceTarget]);
             this.renderer.clear();
+
+            this.pingPongQuad.material.map = this.composer.renderTarget2.texture;
+            this.pingPongQuad.material.needsUpdate = true;
             
-            // Copie de la texture finale
-            const quad = new THREE.Mesh(
-                new THREE.PlaneGeometry(2, 2),
-                new THREE.MeshBasicMaterial({ 
-                    map: this.composer.renderTarget2.texture,
-                    transparent: true 
-                })
-            );
-            quad.frustumCulled = false;
-            const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
-            const tempScene = new THREE.Scene();
-            tempScene.add(quad);
-            
-            this.renderer.render(tempScene, orthoCamera);
+            this.renderer.render(this.pingPongScene, this.pingPongCamera);
             this.currentPersistenceTarget = 1 - this.currentPersistenceTarget;
     
             // Rendu final à l'écran
             this.renderer.setRenderTarget(null);
             this.composer.render();
-            
-            // Cleanup
-            quad.geometry.dispose();
-            quad.material.dispose();
         }
     }
 
@@ -312,5 +309,8 @@ export class Renderer {
             this.composer.renderTarget2.dispose();
         }
         this.renderer.dispose();
+
+        this.pingPongQuad.geometry.dispose();
+        this.pingPongQuad.material.dispose();
     }
 }
