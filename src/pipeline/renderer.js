@@ -7,7 +7,9 @@ import {
     luminanceFragmentShader,
     crtDistortionFragmentShader,
     chromaticAberrationFragmentShader,
-    scanlinesFragmentShader
+    scanlinesFragmentShader,
+    glowHorizontalFragmentShader,
+    glowVerticalFragmentShader
 } from '../shaders/shaders';
 
 export class Renderer {
@@ -24,8 +26,15 @@ export class Renderer {
         this.distortionPass = null;
         this.chromaticAberrationPass = null;
         this.scanlinesPass = null;
+        this.glowHorizontalPass = null;
+        this.glowVerticalPass = null;
         this.renderTarget = null;
+        this.persistenceTarget = null;
         this.clock = new THREE.Clock();
+
+        // Pour le ping-pong de la persistence
+        this.persistenceTargets = [null, null];
+        this.currentPersistenceTarget = 0;
     }
 
     init(scene, camera) {
@@ -34,20 +43,34 @@ export class Renderer {
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.outputEncoding = THREE.sRGBEncoding;
 
-        // Création du render target optimisé
+        // Création des render targets
+        const targetOptions = {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            encoding: THREE.sRGBEncoding,
+            samples: 0
+        };
+
         this.renderTarget = new THREE.WebGLRenderTarget(
             window.innerWidth,
             window.innerHeight,
-            {
-                minFilter: THREE.LinearFilter,
-                magFilter: THREE.LinearFilter,
-                format: THREE.RGBAFormat,
-                encoding: THREE.sRGBEncoding,
-                samples: 0
-            }
+            targetOptions
+        );
+
+        // Création des targets pour la persistence
+        this.persistenceTargets[0] = new THREE.WebGLRenderTarget(
+            window.innerWidth,
+            window.innerHeight,
+            targetOptions
+        );
+        this.persistenceTargets[1] = new THREE.WebGLRenderTarget(
+            window.innerWidth,
+            window.innerHeight,
+            targetOptions
         );
         
-        // Création du composer avec le render target optimisé
+        // Création du composer principal
         this.composer = new EffectComposer(this.renderer, this.renderTarget);
         
         // Passe de rendu de base
@@ -110,6 +133,39 @@ export class Renderer {
         };
         this.scanlinesPass = new ShaderPass(scanlinesShader);
         this.composer.addPass(this.scanlinesPass);
+
+        // Passes de glow
+        const glowHorizontalShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                glowRadius: { value: 2.0 },
+                glowIntensity: { value: 0.5 },
+                resolution: { 
+                    value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
+                }
+            },
+            vertexShader: baseVertexShader,
+            fragmentShader: glowHorizontalFragmentShader
+        };
+        this.glowHorizontalPass = new ShaderPass(glowHorizontalShader);
+        this.composer.addPass(this.glowHorizontalPass);
+
+        const glowVerticalShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                tPersistence: { value: this.persistenceTargets[0].texture },
+                glowRadius: { value: 2.0 },
+                glowIntensity: { value: 0.5 },
+                persistence: { value: 0.9 },
+                resolution: { 
+                    value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
+                }
+            },
+            vertexShader: baseVertexShader,
+            fragmentShader: glowVerticalFragmentShader
+        };
+        this.glowVerticalPass = new ShaderPass(glowVerticalShader);
+        this.composer.addPass(this.glowVerticalPass);
     }
 
     setLuminance(value) {
@@ -144,36 +200,112 @@ export class Renderer {
         }
     }
 
+    setGlow(radius, intensity, persistence) {
+        if (this.glowHorizontalPass && this.glowVerticalPass) {
+            if (radius !== undefined) {
+                this.glowHorizontalPass.uniforms.glowRadius.value = radius;
+                this.glowVerticalPass.uniforms.glowRadius.value = radius;
+            }
+            if (intensity !== undefined) {
+                this.glowHorizontalPass.uniforms.glowIntensity.value = intensity;
+                this.glowVerticalPass.uniforms.glowIntensity.value = intensity;
+            }
+            if (persistence !== undefined) {
+                this.glowVerticalPass.uniforms.persistence.value = persistence;
+            }
+        }
+    }
+
     render() {
         if (this.composer) {
             // Mise à jour du temps pour l'animation des scanlines
             if (this.scanlinesPass) {
                 this.scanlinesPass.uniforms.time.value = this.clock.getElapsedTime();
             }
+    
+            // Mise à jour de la texture de persistence
+            if (this.glowVerticalPass) {
+                this.glowVerticalPass.uniforms.tPersistence.value = 
+                    this.persistenceTargets[this.currentPersistenceTarget].texture;
+            }
+    
+            // Rendu dans le target actuel
             this.composer.render();
+    
+            // Copie du résultat dans le prochain target de persistence
+            this.renderer.setRenderTarget(this.persistenceTargets[1 - this.currentPersistenceTarget]);
+            this.renderer.clear();
+            
+            // Copie de la texture finale
+            const quad = new THREE.Mesh(
+                new THREE.PlaneGeometry(2, 2),
+                new THREE.MeshBasicMaterial({ 
+                    map: this.composer.renderTarget2.texture,
+                    transparent: true 
+                })
+            );
+            quad.frustumCulled = false;
+            const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
+            const tempScene = new THREE.Scene();
+            tempScene.add(quad);
+            
+            this.renderer.render(tempScene, orthoCamera);
+            this.currentPersistenceTarget = 1 - this.currentPersistenceTarget;
+    
+            // Rendu final à l'écran
+            this.renderer.setRenderTarget(null);
+            this.composer.render();
+            
+            // Cleanup
+            quad.geometry.dispose();
+            quad.material.dispose();
         }
     }
 
     setSize(width, height) {
         this.renderer.setSize(width, height);
+        const resolution = new THREE.Vector2(width, height);
+
         if (this.renderTarget) {
             this.renderTarget.setSize(width, height);
         }
+
+        // Mise à jour des targets de persistence
+        if (this.persistenceTargets[0]) {
+            this.persistenceTargets[0].setSize(width, height);
+        }
+        if (this.persistenceTargets[1]) {
+            this.persistenceTargets[1].setSize(width, height);
+        }
+        
         if (this.composer) {
             this.composer.setSize(width, height);
         }
-        const resolution = new THREE.Vector2(width, height);
+
+        // Mise à jour des résolutions dans les uniforms
         if (this.distortionPass) {
             this.distortionPass.uniforms.resolution.value.copy(resolution);
         }
         if (this.scanlinesPass) {
             this.scanlinesPass.uniforms.resolution.value.copy(resolution);
         }
+        if (this.glowHorizontalPass) {
+            this.glowHorizontalPass.uniforms.resolution.value.copy(resolution);
+        }
+        if (this.glowVerticalPass) {
+            this.glowVerticalPass.uniforms.resolution.value.copy(resolution);
+        }
     }
 
     dispose() {
         if (this.renderTarget) {
             this.renderTarget.dispose();
+        }
+        if (this.persistenceTargets[0]) {
+            this.persistenceTargets[0].dispose();
+        }
+        if (this.persistenceTargets[1]) {
+            this.persistenceTargets[1].dispose();
         }
         if (this.composer) {
             this.composer.renderTarget1.dispose();

@@ -83,7 +83,7 @@ export const scanlinesFragmentShader = `
     uniform sampler2D tDiffuse;
     uniform float time;
     uniform vec2 resolution;
-    uniform float scanlineIntensity;  // Intensité des lignes
+uniform float scanlineIntensity;  // Intensité des lignes
     uniform float scanlineCount;      // Nombre de lignes
     uniform float scanlineSpeed;      // Vitesse de défilement
     varying vec2 vUv;
@@ -117,5 +117,75 @@ export const scanlinesFragmentShader = `
         color *= 1.0 + (1.0 - scanlineEffect) * 0.2;
         
         gl_FragColor = vec4(color, texel.a);
+    }
+`;
+
+export const glowHorizontalFragmentShader = `
+    uniform sampler2D tDiffuse;
+    uniform float glowRadius;
+    uniform float glowIntensity;
+    uniform vec2 resolution;
+    varying vec2 vUv;
+
+    // Poids gaussiens pour 5 échantillons
+    const float weights[5] = float[5](0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+
+    void main() {
+        vec2 texel = vec2(1.0 / resolution.x, 1.0 / resolution.y);
+        vec3 result = texture2D(tDiffuse, vUv).rgb * weights[0];
+        
+        // Échantillonnage horizontal
+        for(int i = 1; i < 5; i++) {
+            vec2 offset = vec2(texel.x * float(i) * glowRadius, 0.0);
+            result += texture2D(tDiffuse, vUv + offset).rgb * weights[i];
+            result += texture2D(tDiffuse, vUv - offset).rgb * weights[i];
+        }
+        
+        gl_FragColor = vec4(result, 1.0);
+    }
+`;
+
+// Passe verticale du glow gaussien avec persistence
+export const glowVerticalFragmentShader = `
+    uniform sampler2D tDiffuse;
+    uniform sampler2D tPersistence; // Texture de la frame précédente
+    uniform float glowRadius;
+    uniform float glowIntensity;
+    uniform float persistence;     // Force de la persistence (0-1)
+    uniform vec2 resolution;
+    varying vec2 vUv;
+
+    // Poids gaussiens pour 5 échantillons
+    const float weights[5] = float[5](0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+
+    // Fonction pour ajuster la persistence selon la couleur
+    // Les phosphores réels ont des taux de décroissance différents selon la couleur
+    vec3 adjustPersistence(vec3 color) {
+        return vec3(
+            color.r * 0.95,  // Rouge décroit un peu plus vite
+            color.g * 0.97,  // Vert persiste un peu plus
+            color.b * 0.93   // Bleu décroit le plus vite
+        );
+    }
+
+    void main() {
+        vec2 texel = vec2(1.0 / resolution.x, 1.0 / resolution.y);
+        vec3 result = texture2D(tDiffuse, vUv).rgb * weights[0];
+        
+        // Échantillonnage vertical
+        for(int i = 1; i < 5; i++) {
+            vec2 offset = vec2(0.0, texel.y * float(i) * glowRadius);
+            result += texture2D(tDiffuse, vUv + offset).rgb * weights[i];
+            result += texture2D(tDiffuse, vUv - offset).rgb * weights[i];
+        }
+        
+        // Ajout de la persistence
+        vec3 oldColor = texture2D(tPersistence, vUv).rgb;
+        vec3 persistentColor = adjustPersistence(oldColor) * persistence;
+        
+        // Mélange du glow actuel avec la persistence
+        vec3 finalColor = mix(result, persistentColor, persistence);
+        finalColor *= glowIntensity;        
+        gl_FragColor = vec4(finalColor, 1.0);
     }
 `;
