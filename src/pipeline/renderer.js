@@ -13,12 +13,21 @@ import {
 } from '../shaders/shaders';
 
 export class Renderer {
-    constructor(canvas) {
+    constructor(canvas) {       
         this.renderer = new THREE.WebGLRenderer({
             canvas: canvas,
             antialias: true,
             powerPreference: "high-performance"
         });
+
+        // État d'activation des passes
+        this.enabledPasses = {
+            luminance: true,
+            distortion: true,
+            aberration: true,
+            scanlines: true,
+            glow: true
+        };
         
         this.composer = null;
         this.renderScene = null;
@@ -44,41 +53,53 @@ export class Renderer {
         this.pingPongCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
         this.pingPongScene = new THREE.Scene();
         this.pingPongScene.add(this.pingPongQuad);
+
+        // Pour mesurer le cycle de vie total
+        this.startTime = performance.now();
     }
 
     init(scene, camera) {
+        performance.mark('init-render-start');
+        
         // Configuration du renderer
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.outputEncoding = THREE.sRGBEncoding;
 
-        // Création des render targets
-        const targetOptions = {
-            minFilter: THREE.NearestFilter,
+        // Options pour le render target principal
+        const mainTargetOptions = {
+            minFilter: THREE.LinearFilter,
             magFilter: THREE.LinearFilter,
-            format: THREE.RGBFormat,
+            format: THREE.RGBAFormat,
             encoding: THREE.sRGBEncoding,
-            samples: 0,
-            width: window.innerWidth * 0.5,
-            height: window.innerHeight * 0.5
+            samples: 0
+        };
+
+        // Options pour les render targets du glow
+        const glowTargetOptions = {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            encoding: THREE.LinearEncoding,
+            samples: 0
         };
 
         this.renderTarget = new THREE.WebGLRenderTarget(
             window.innerWidth,
             window.innerHeight,
-            targetOptions
+            mainTargetOptions
         );
 
-        // Création des targets pour la persistence
+        // Création des targets pour la persistence en basse résolution
         this.persistenceTargets[0] = new THREE.WebGLRenderTarget(
-            window.innerWidth,
-            window.innerHeight,
-            targetOptions
+            window.innerWidth * 0.5,
+            window.innerHeight * 0.5,
+            glowTargetOptions
         );
         this.persistenceTargets[1] = new THREE.WebGLRenderTarget(
-            window.innerWidth,
-            window.innerHeight,
-            targetOptions
+            window.innerWidth * 0.5,
+            window.innerHeight * 0.5,
+            glowTargetOptions
         );
         
         // Création du composer principal
@@ -152,7 +173,7 @@ export class Renderer {
                 glowRadius: { value: 2.0 },
                 glowIntensity: { value: 0.5 },
                 resolution: { 
-                    value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
+                    value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) 
                 }
             },
             vertexShader: baseVertexShader,
@@ -169,7 +190,7 @@ export class Renderer {
                 glowIntensity: { value: 0.5 },
                 persistence: { value: 0.9 },
                 resolution: { 
-                    value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
+                    value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) 
                 }
             },
             vertexShader: baseVertexShader,
@@ -177,6 +198,9 @@ export class Renderer {
         };
         this.glowVerticalPass = new ShaderPass(glowVerticalShader);
         this.composer.addPass(this.glowVerticalPass);
+        
+        performance.mark('init-render-end');
+        performance.measure('Renderer Init', 'init-render-start', 'init-render-end');
     }
 
     setLuminance(value) {
@@ -229,13 +253,21 @@ export class Renderer {
 
     render() {
         if (this.composer) {
+            // Activer/désactiver les passes selon leur état
+            if (this.luminancePass) this.luminancePass.enabled = this.enabledPasses.luminance;
+            if (this.distortionPass) this.distortionPass.enabled = this.enabledPasses.distortion;
+            if (this.chromaticAberrationPass) this.chromaticAberrationPass.enabled = this.enabledPasses.aberration;
+            if (this.scanlinesPass) this.scanlinesPass.enabled = this.enabledPasses.scanlines;
+            if (this.glowHorizontalPass) this.glowHorizontalPass.enabled = this.enabledPasses.glow;
+            if (this.glowVerticalPass) this.glowVerticalPass.enabled = this.enabledPasses.glow;
+            
             // Mise à jour du temps pour l'animation des scanlines
-            if (this.scanlinesPass) {
+            if (this.scanlinesPass && this.enabledPasses.scanlines) {
                 this.scanlinesPass.uniforms.time.value = this.clock.getElapsedTime();
             }
     
             // Mise à jour de la texture de persistence
-            if (this.glowVerticalPass) {
+            if (this.glowVerticalPass && this.enabledPasses.glow) {
                 this.glowVerticalPass.uniforms.tPersistence.value = 
                     this.persistenceTargets[this.currentPersistenceTarget].texture;
             }
@@ -295,6 +327,10 @@ export class Renderer {
     }
 
     dispose() {
+        const endTime = performance.now();
+        const totalLifetime = endTime - this.startTime;
+        console.log(`Total renderer lifetime: ${totalLifetime}ms`);
+
         if (this.renderTarget) {
             this.renderTarget.dispose();
         }
@@ -308,9 +344,14 @@ export class Renderer {
             this.composer.renderTarget1.dispose();
             this.composer.renderTarget2.dispose();
         }
-        this.renderer.dispose();
 
-        this.pingPongQuad.geometry.dispose();
-        this.pingPongQuad.material.dispose();
+        // Clean up des éléments de ping-pong
+        if (this.pingPongQuad) {
+            this.pingPongQuad.geometry.dispose();
+            this.pingPongQuad.material.dispose();
+        }
+        
+        // Nettoyage final du renderer
+        this.renderer.dispose();
     }
 }

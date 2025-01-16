@@ -11,16 +11,35 @@ const Scene = () => {
     const geometryRef = useRef(null);
     const materialRef = useRef(null);
     const statsRef = useRef(null);
+    const customPanelRef = useRef(null);
 
     useEffect(() => {
         // Initialisation des stats
         const stats = new Stats();
         stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+        
+        // Création du panel personnalisé
+        const customPanel = new Stats.Panel('Pipeline', '#ff8', '#221');
+        stats.addPanel(customPanel);
+        customPanelRef.current = customPanel;
+        
+        // Configuration de l'affichage des stats
         stats.dom.style.position = 'absolute';
-        stats.dom.style.right = '0px';  // Placé à droite au lieu de gauche
+        stats.dom.style.right = '0px';
         stats.dom.style.top = '0px';
         document.body.appendChild(stats.dom);
         statsRef.current = stats;
+
+        // Création du panneau de contrôle
+        const controlPanel = document.createElement('div');
+        controlPanel.style.position = 'absolute';
+        controlPanel.style.left = '10px';
+        controlPanel.style.top = '110px';
+        controlPanel.style.backgroundColor = 'rgba(0,0,0,0.7)';
+        controlPanel.style.padding = '10px';
+        controlPanel.style.color = 'white';
+        controlPanel.style.fontFamily = 'monospace';
+        document.body.appendChild(controlPanel);
 
         // Initialisation de la scène
         const scene = new THREE.Scene();
@@ -61,18 +80,54 @@ const Scene = () => {
         renderer.setScanlines(0.3, 100, 2.0);
         renderer.setGlow(1.5, 0.5, 0.85);
 
+        // Création des contrôles
+        const passes = ['luminance', 'distortion', 'aberration', 'scanlines', 'glow'];
+        passes.forEach(pass => {
+            const container = document.createElement('div');
+            container.style.marginBottom = '5px';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = pass;
+            checkbox.checked = true;
+            checkbox.onchange = () => {
+                if (rendererRef.current) {
+                    rendererRef.current.enabledPasses[pass] = checkbox.checked;
+                }
+            };
+            
+            const label = document.createElement('label');
+            label.htmlFor = pass;
+            label.textContent = ` ${pass.charAt(0).toUpperCase() + pass.slice(1)}`;
+            label.style.marginLeft = '5px';
+            
+            container.appendChild(checkbox);
+            container.appendChild(label);
+            controlPanel.appendChild(container);
+        });
+
         // Animation loop
         let frameId;
         const animate = () => {
             frameId = requestAnimationFrame(animate);
             
-            // Début de la mesure
             stats.begin();
             
             animateCube();
             renderer.render();
             
-            // Fin de la mesure
+            // Mise à jour du panel personnalisé avec les mesures de performance
+            const measures = performance.getEntriesByType('measure');
+            let panelText = '';
+            measures.forEach(measure => {
+                panelText += `${measure.name}: ${measure.duration.toFixed(2)}ms\n`;
+            });
+            customPanel.update(undefined, undefined, panelText);
+            
+            // Nettoyage des mesures pour la prochaine frame
+            performance.clearMarks();
+            performance.clearMeasures();
+            
             stats.end();
         };
         animate();
@@ -96,6 +151,9 @@ const Scene = () => {
             if (statsRef.current) {
                 document.body.removeChild(statsRef.current.dom);
             }
+            
+            // Retirer le panneau de contrôle
+            document.body.removeChild(controlPanel);
             
             // Cleanup Three.js resources
             if (geometryRef.current) {
