@@ -45,6 +45,7 @@ const Scene = () => {
         rendererRef.current = renderer;
         renderer.init(scene, camera);
         renderer.setLuminance(0.1)
+        renderer.setDistortion(0.05)
 
         // Animation loop
         let frameId;

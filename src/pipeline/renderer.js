@@ -2,7 +2,11 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { baseVertexShader, luminanceFragmentShader } from '../shaders/shaders';
+import { 
+    baseVertexShader, 
+    luminanceFragmentShader,
+    crtDistortionFragmentShader 
+} from '../shaders/shaders';
 
 export class Renderer {
     constructor(canvas) {
@@ -15,6 +19,7 @@ export class Renderer {
         this.composer = null;
         this.renderScene = null;
         this.luminancePass = null;
+        this.distortionPass = null;
         this.renderTarget = null;
     }
 
@@ -48,7 +53,7 @@ export class Renderer {
         const luminanceShader = {
             uniforms: {
                 tDiffuse: { value: null },
-                luminanceBase: { value: 0.05 }  // Valeur de base ajustable
+                luminanceBase: { value: 0.05 }
             },
             vertexShader: baseVertexShader,
             fragmentShader: luminanceFragmentShader
@@ -56,12 +61,35 @@ export class Renderer {
         
         this.luminancePass = new ShaderPass(luminanceShader);
         this.composer.addPass(this.luminancePass);
+
+        // Passe de distortion CRT
+        const distortionShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                distortionIntensity: { value: 0.3 },
+                resolution: { 
+                    value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
+                }
+            },
+            vertexShader: baseVertexShader,
+            fragmentShader: crtDistortionFragmentShader
+        };
+        
+        this.distortionPass = new ShaderPass(distortionShader);
+        this.composer.addPass(this.distortionPass);
     }
 
     // Permet d'ajuster la luminance depuis l'extérieur
     setLuminance(value) {
         if (this.luminancePass) {
             this.luminancePass.uniforms.luminanceBase.value = value;
+        }
+    }
+
+    // Permet d'ajuster la distortion depuis l'extérieur
+    setDistortion(value) {
+        if (this.distortionPass) {
+            this.distortionPass.uniforms.distortionIntensity.value = value;
         }
     }
 
@@ -78,6 +106,10 @@ export class Renderer {
         }
         if (this.composer) {
             this.composer.setSize(width, height);
+        }
+        // Met à jour la résolution pour la distortion
+        if (this.distortionPass) {
+            this.distortionPass.uniforms.resolution.value.set(width, height);
         }
     }
 
