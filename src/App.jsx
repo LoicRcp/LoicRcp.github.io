@@ -1,9 +1,9 @@
-import MainScene from './components/Scene/MainScene'
+import Scene from './components/Scene/Scene'
 
 function App() {
   return (
     <div className="fixed inset-0 w-full h-full bg-black">
-      <MainScene />
+      <Scene />
     </div>
   )
 }
