@@ -2,47 +2,117 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
+
+// Import des shaders
+import { createTrigLUT } from '../utils/trigLUT';
 import { 
-    baseVertexShader, 
-    luminanceFragmentShader,
-    crtDistortionFragmentShader,
-    chromaticAberrationFragmentShader,
-    scanlinesFragmentShader,
-    glowHorizontalFragmentShader,
-    glowVerticalFragmentShader
+    baseVertexShader,
+    downsampleFragmentShader,
+    upsampleFragmentShader,
+    crtDistortionFragmentShader as crtDistortionShader,
+    scanlinesFragmentShader as scanlinesShader,
+    glowVerticalFragmentShader as phosphorGlowShader
 } from '../shaders/shaders';
 
 export class Renderer {
-    constructor(canvas) {       
+    constructor(canvas) {
+        console.log('Initializing Renderer with canvas:', canvas);
+        if (!canvas) {
+            console.error('No canvas provided to Renderer');
+            return;
+        }
+
+        // Vérification des capacités WebGL
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        if (!gl) {
+            console.error('WebGL not supported');
+            return;
+        }
+        console.log('WebGL Capabilities:', gl.getParameter(gl.VERSION));
+
         this.renderer = new THREE.WebGLRenderer({
             canvas: canvas,
-            antialias: true,
+            antialias: false,
             powerPreference: "high-performance"
         });
 
+        // Options communes pour tous les render targets
+        this.renderTargetOptions = {
+            minFilter: THREE.NearestFilter,
+            magFilter: THREE.NearestFilter,
+            format: THREE.RGBAFormat,
+            type: THREE.UnsignedByteType,
+            encoding: THREE.sRGBEncoding,
+            depthBuffer: true,
+            stencilBuffer: false,
+            samples: 0
+        };
+
+        // Obtenir les dimensions initiales correctes
+        const width = canvas.clientWidth || window.innerWidth;
+        const height = canvas.clientHeight || window.innerHeight;
+        console.log('Initial dimensions:', width, height);
+
+        // Full-res render target pour mainComposer
+        this.mainRenderTarget = new THREE.WebGLRenderTarget(
+            width,
+            height,
+            {
+                ...this.renderTargetOptions,
+                samples: gl instanceof WebGL2RenderingContext ? 4 : 0
+            }
+        );
+
+        // Half-res render target pour postComposer
+        const halfWidth = Math.floor(width * 0.5);
+        const halfHeight = Math.floor(height * 0.5);
+        this.postRenderTarget = new THREE.WebGLRenderTarget(
+            halfWidth,
+            halfHeight,
+            this.renderTargetOptions
+        );
+
+        // Render targets pour ping-pong de la persistence
+        this.persistenceTargets = [
+            new THREE.WebGLRenderTarget(
+                halfWidth,
+                halfHeight,
+                this.renderTargetOptions
+            ),
+            new THREE.WebGLRenderTarget(
+                halfWidth,
+                halfHeight,
+                this.renderTargetOptions
+            )
+        ];
+
+        console.log('Render targets created:', {
+            main: [this.mainRenderTarget.width, this.mainRenderTarget.height],
+            post: [this.postRenderTarget.width, this.postRenderTarget.height],
+            persistence: [this.persistenceTargets[0].width, this.persistenceTargets[0].height]
+        });
+
+        // Création de la LUT trigonométrique
+        this.trigLUT = createTrigLUT(512);
+
         // État d'activation des passes
         this.enabledPasses = {
-            luminance: true,
-            distortion: true,
-            aberration: true,
+            crt: true,
             scanlines: true,
             glow: true
         };
         
-        this.composer = null;
-        this.renderScene = null;
-        this.luminancePass = null;
-        this.distortionPass = null;
+        // Initialisation des variables
+        this.mainComposer = null;
+        this.postComposer = null;
+        this.copyPass = null;
+        this.upsamplePass = null;
+        this.combinedPass = null;
         this.chromaticAberrationPass = null;
         this.scanlinesPass = null;
         this.glowHorizontalPass = null;
         this.glowVerticalPass = null;
-        this.renderTarget = null;
-        this.persistenceTarget = null;
         this.clock = new THREE.Clock();
-
-        // Pour le ping-pong de la persistence
-        this.persistenceTargets = [null, null];
         this.currentPersistenceTarget = 0;
 
         this.pingPongQuad = new THREE.Mesh(
@@ -65,159 +135,104 @@ export class Renderer {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.outputEncoding = THREE.sRGBEncoding;
-
-        // Options pour le render target principal
-        const mainTargetOptions = {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            format: THREE.RGBAFormat,
-            encoding: THREE.sRGBEncoding,
-            samples: 0
-        };
-
-        // Options pour les render targets du glow
-        const glowTargetOptions = {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            format: THREE.RGBAFormat,
-            encoding: THREE.LinearEncoding,
-            samples: 0
-        };
-
-        this.renderTarget = new THREE.WebGLRenderTarget(
-            window.innerWidth,
-            window.innerHeight,
-            mainTargetOptions
-        );
-
-        // Création des targets pour la persistence en basse résolution
-        this.persistenceTargets[0] = new THREE.WebGLRenderTarget(
-            window.innerWidth * 0.5,
-            window.innerHeight * 0.5,
-            glowTargetOptions
-        );
-        this.persistenceTargets[1] = new THREE.WebGLRenderTarget(
-            window.innerWidth * 0.5,
-            window.innerHeight * 0.5,
-            glowTargetOptions
-        );
         
-        // Création du composer principal
-        this.composer = new EffectComposer(this.renderer, this.renderTarget);
-        
-        // Passe de rendu de base
-        this.renderScene = new RenderPass(scene, camera);
-        this.composer.addPass(this.renderScene);
+        // Main composer - rendu initial en full-res
+        this.mainComposer = new EffectComposer(this.renderer, this.mainRenderTarget);
+        const renderPass = new RenderPass(scene,camera);
+        this.mainComposer.addPass(renderPass);
 
-        // Passe de luminance
-        const luminanceShader = {
+        // Post-processing composer - effets en half-res
+        this.postComposer = new EffectComposer(this.renderer, this.postRenderTarget);
+
+        // Passe de copie depuis mainComposer avec downsampling
+        this.copyPass = new ShaderPass({
             uniforms: {
-                tDiffuse: { value: null },
-                luminanceBase: { value: 0.05 }
+                tDiffuse: { value: this.mainComposer.renderTarget2.texture },
+                resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
             },
             vertexShader: baseVertexShader,
-            fragmentShader: luminanceFragmentShader
-        };
-        this.luminancePass = new ShaderPass(luminanceShader);
-        this.composer.addPass(this.luminancePass);
+            fragmentShader: downsampleFragmentShader
+        });
+        this.copyPass.renderToScreen = false;
+        this.postComposer.addPass(this.copyPass);
 
-        // Passe de distortion CRT
-        const distortionShader = {
+        // Passe CRT optimisée avec distortion + vignette
+        const crtShader = {
             uniforms: {
                 tDiffuse: { value: null },
-                distortionIntensity: { value: 0.3 },
-                resolution: { 
-                    value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
-                }
+                curvature: { value: 10.0 },
+                vignetteWidth: { value: 30.0 },
+                vignetteIntensity: { value: 0.8 },
+                resolution: { value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) },
+                luminanceBase: { value: 0.1 },
+                distortionIntensity: { value: 0.05 }
+
             },
             vertexShader: baseVertexShader,
-            fragmentShader: crtDistortionFragmentShader
+            fragmentShader: crtDistortionShader
         };
-        this.distortionPass = new ShaderPass(distortionShader);
-        this.composer.addPass(this.distortionPass);
+        this.crtPass = new ShaderPass(crtShader);
+        this.postComposer.addPass(this.crtPass);
 
-        // Passe d'aberration chromatique
-        const chromaticAberrationShader = {
+
+
+        // Passe des scanlines RGB optimisées
+        const scanlinesShaderObj = {
             uniforms: {
                 tDiffuse: { value: null },
-                aberrationIntensity: { value: 3.0 }
-            },
-            vertexShader: baseVertexShader,
-            fragmentShader: chromaticAberrationFragmentShader
-        };
-        this.chromaticAberrationPass = new ShaderPass(chromaticAberrationShader);
-        this.composer.addPass(this.chromaticAberrationPass);
-
-        // Passe des scanlines
-        const scanlinesShader = {
-            uniforms: {
-                tDiffuse: { value: null },
+                trigLUT: { value: this.trigLUT },
                 time: { value: 0.0 },
-                resolution: { 
-                    value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
-                },
+                resolution: { value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) },
                 scanlineIntensity: { value: 0.3 },
                 scanlineCount: { value: 100.0 },
                 scanlineSpeed: { value: 2.0 }
             },
             vertexShader: baseVertexShader,
-            fragmentShader: scanlinesFragmentShader
+            fragmentShader: scanlinesShader
         };
-        this.scanlinesPass = new ShaderPass(scanlinesShader);
-        this.composer.addPass(this.scanlinesPass);
+        this.scanlinesPass = new ShaderPass(scanlinesShaderObj);
+        this.postComposer.addPass(this.scanlinesPass);
 
-        // Passes de glow
-        const glowHorizontalShader = {
-            uniforms: {
-                tDiffuse: { value: null },
-                glowRadius: { value: 2.0 },
-                glowIntensity: { value: 0.5 },
-                resolution: { 
-                    value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) 
-                }
-            },
-            vertexShader: baseVertexShader,
-            fragmentShader: glowHorizontalFragmentShader
-        };
-        this.glowHorizontalPass = new ShaderPass(glowHorizontalShader);
-        this.composer.addPass(this.glowHorizontalPass);
-
-        const glowVerticalShader = {
+        // Passe de glow avec effet phosphore
+        const phosphorGlowShaderObj = {
             uniforms: {
                 tDiffuse: { value: null },
                 tPersistence: { value: this.persistenceTargets[0].texture },
                 glowRadius: { value: 2.0 },
                 glowIntensity: { value: 0.5 },
                 persistence: { value: 0.9 },
-                resolution: { 
-                    value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) 
-                }
+                time: { value: 0.0 },
+                resolution: { value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) }
             },
             vertexShader: baseVertexShader,
-            fragmentShader: glowVerticalFragmentShader
+            fragmentShader: phosphorGlowShader
         };
-        this.glowVerticalPass = new ShaderPass(glowVerticalShader);
-        this.composer.addPass(this.glowVerticalPass);
+        this.glowPass = new ShaderPass(phosphorGlowShaderObj);
+        this.postComposer.addPass(this.glowPass);
+
+        // Passe d'upsampling finale
+        this.upsamplePass = new ShaderPass({
+            uniforms: {
+                tDiffuse: { value: null },
+                resolution: { value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) }
+            },
+            vertexShader: baseVertexShader,
+            fragmentShader: upsampleFragmentShader
+        });
+        this.upsamplePass.renderToScreen = true;
+        this.postComposer.addPass(this.upsamplePass);
+
+
         
         performance.mark('init-render-end');
         performance.measure('Renderer Init', 'init-render-start', 'init-render-end');
     }
 
-    setLuminance(value) {
-        if (this.luminancePass) {
-            this.luminancePass.uniforms.luminanceBase.value = value;
-        }
-    }
-
-    setDistortion(value) {
-        if (this.distortionPass) {
-            this.distortionPass.uniforms.distortionIntensity.value = value;
-        }
-    }
-
-    setAberration(value) {
-        if (this.chromaticAberrationPass) {
-            this.chromaticAberrationPass.uniforms.aberrationIntensity.value = value;
+    setCRTEffect(curvature, vignetteWidth, vignetteIntensity) {
+        if (this.crtPass) {
+            if (curvature !== undefined) this.crtPass.uniforms.curvature.value = curvature;
+            if (vignetteWidth !== undefined) this.crtPass.uniforms.vignetteWidth.value = vignetteWidth;
+            if (vignetteIntensity !== undefined) this.crtPass.uniforms.vignetteIntensity.value = vignetteIntensity;
         }
     }
 
@@ -252,106 +267,199 @@ export class Renderer {
     }
 
     render() {
-        if (this.composer) {
-            // Activer/désactiver les passes selon leur état
-            if (this.luminancePass) this.luminancePass.enabled = this.enabledPasses.luminance;
-            if (this.distortionPass) this.distortionPass.enabled = this.enabledPasses.distortion;
-            if (this.chromaticAberrationPass) this.chromaticAberrationPass.enabled = this.enabledPasses.aberration;
-            if (this.scanlinesPass) this.scanlinesPass.enabled = this.enabledPasses.scanlines;
-            if (this.glowHorizontalPass) this.glowHorizontalPass.enabled = this.enabledPasses.glow;
-            if (this.glowVerticalPass) this.glowVerticalPass.enabled = this.enabledPasses.glow;
-            
-            // Mise à jour du temps pour l'animation des scanlines
-            if (this.scanlinesPass && this.enabledPasses.scanlines) {
-                this.scanlinesPass.uniforms.time.value = this.clock.getElapsedTime();
-            }
-    
-            // Mise à jour de la texture de persistence
-            if (this.glowVerticalPass && this.enabledPasses.glow) {
-                this.glowVerticalPass.uniforms.tPersistence.value = 
-                    this.persistenceTargets[this.currentPersistenceTarget].texture;
-            }
-    
-            // Rendu dans le target actuel
-            this.composer.render();
-    
-            // Copie du résultat dans le prochain target de persistence
-            this.renderer.setRenderTarget(this.persistenceTargets[1 - this.currentPersistenceTarget]);
-            this.renderer.clear();
-
-            this.pingPongQuad.material.map = this.composer.renderTarget2.texture;
-            this.pingPongQuad.material.needsUpdate = true;
-            
-            this.renderer.render(this.pingPongScene, this.pingPongCamera);
-            this.currentPersistenceTarget = 1 - this.currentPersistenceTarget;
-    
-            // Rendu final à l'écran
-            this.renderer.setRenderTarget(null);
-            this.composer.render();
-        }
-    }
-
-    setSize(width, height) {
-        this.renderer.setSize(width, height);
-        const resolution = new THREE.Vector2(width, height);
-
-        if (this.renderTarget) {
-            this.renderTarget.setSize(width, height);
+        if (!this.mainComposer || !this.postComposer) {
+            console.warn('Composers not initialized');
+            return;
         }
 
-        // Mise à jour des targets de persistence
-        if (this.persistenceTargets[0]) {
-            this.persistenceTargets[0].setSize(width, height);
+        performance.mark('render-start');
+
+        // Vérification et mise à jour des dimensions
+        const canvas = this.renderer.domElement;
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        const needsResize = canvas.width !== width || canvas.height !== height;
+        
+        if (needsResize) {
+            console.log('Canvas needs resize:', width, height);
+            this.setSize(width, height);
         }
-        if (this.persistenceTargets[1]) {
-            this.persistenceTargets[1].setSize(width, height);
+
+        // Activer/désactiver les passes selon leur état
+        if (this.crtPass) this.crtPass.enabled = this.enabledPasses.crt;
+        if (this.scanlinesPass) this.scanlinesPass.enabled = this.enabledPasses.scanlines;
+        if (this.glowPass) this.glowPass.enabled = this.enabledPasses.glow;
+        
+        // Mise à jour des uniforms temporels
+        const time = this.clock.getElapsedTime();
+        performance.mark('update-uniforms-start');
+        
+        if (this.scanlinesPass && this.enabledPasses.scanlines) {
+            this.scanlinesPass.uniforms.time.value = time;
         }
         
-        if (this.composer) {
-            this.composer.setSize(width, height);
+        if (this.glowPass && this.enabledPasses.glow) {
+            this.glowPass.uniforms.time.value = time;
+            // Mise à jour de la texture de persistence pour le glow
+            this.glowPass.uniforms.tPersistence.value = 
+                this.persistenceTargets[this.currentPersistenceTarget].texture;
+        }
+        
+        performance.measure('Update Uniforms', 'update-uniforms-start');
+        
+        // 1. Rendu de la scène en full-res
+        this.renderer.setRenderTarget(this.mainRenderTarget);
+        this.renderer.clear();
+        this.mainComposer.render();
+
+        // 2. Mise à jour de la texture source pour le post-processing
+        this.copyPass.uniforms.tDiffuse.value = this.mainComposer.renderTarget1.texture;
+        performance.mark('post-process-start');
+
+        // 3. Copie de l'état actuel pour la persistence
+        if (this.enabledPasses.glow) {
+            this.renderer.setRenderTarget(this.persistenceTargets[1 - this.currentPersistenceTarget]);
+            this.renderer.clear();
+            this.pingPongQuad.material.map = this.postComposer.renderTarget1.texture;
+            this.pingPongQuad.material.needsUpdate = true;
+            this.renderer.render(this.pingPongScene, this.pingPongCamera);
+            this.currentPersistenceTarget = 1 - this.currentPersistenceTarget;
         }
 
-        // Mise à jour des résolutions dans les uniforms
-        if (this.distortionPass) {
-            this.distortionPass.uniforms.resolution.value.copy(resolution);
+        // 4. Application des effets et rendu final
+        this.renderer.setRenderTarget(null);
+        this.renderer.clear();
+        this.postComposer.render();
+
+        performance.measure('Post-Processing', 'post-process-start');
+        performance.measure('Total Render', 'render-start');
+    }
+    
+
+    setSize(width, height) {
+        console.log('Setting size:', width, height);
+        
+        // Force la taille du viewport
+        this.renderer.domElement.style.width = width + 'px';
+        this.renderer.domElement.style.height = height + 'px';
+        
+        const halfWidth = width * 0.5;
+        const halfHeight = height * 0.5;
+        const resolution = new THREE.Vector2(width, height);
+        const halfResolution = new THREE.Vector2(halfWidth, halfHeight);
+
+        // Renderer principal avec pixel ratio
+        const pixelRatio = Math.min(window.devicePixelRatio, 2);
+        this.renderer.setPixelRatio(pixelRatio);
+        this.renderer.setSize(width, height, false);
+
+        // Full resolution target
+        if (this.mainRenderTarget) {
+            this.mainRenderTarget.setSize(width, height);
         }
-        if (this.scanlinesPass) {
-            this.scanlinesPass.uniforms.resolution.value.copy(resolution);
+
+        // Half resolution targets
+        if (this.postRenderTarget) {
+            this.postRenderTarget.setSize(halfWidth, halfHeight);
         }
-        if (this.glowHorizontalPass) {
-            this.glowHorizontalPass.uniforms.resolution.value.copy(resolution);
+        if (this.persistenceTargets[0]) {
+            this.persistenceTargets[0].setSize(halfWidth, halfHeight);
         }
-        if (this.glowVerticalPass) {
-            this.glowVerticalPass.uniforms.resolution.value.copy(resolution);
+        if (this.persistenceTargets[1]) {
+            this.persistenceTargets[1].setSize(halfWidth, halfHeight);
+        }
+
+        // Mise à jour des résolutions dans toutes les passes
+        const passes = [
+            { pass: this.copyPass, full: true },
+            { pass: this.crtPass, full: false },
+            { pass: this.scanlinesPass, full: false },
+            { pass: this.glowPass, full: false },
+            { pass: this.upsamplePass, full: false }
+        ];
+
+        for (const { pass, full } of passes) {
+            if (pass && pass.uniforms.resolution) {
+                pass.uniforms.resolution.value.copy(full ? resolution : halfResolution);
+            }
+        }
+        if (this.upsamplePass) {
+            this.upsamplePass.uniforms.resolution.value.copy(halfResolution);
+        }
+
+        // Mise à jour des composers
+        if (this.mainComposer) {
+            this.mainComposer.setSize(width, height);
+        }
+        if (this.postComposer) {
+            this.postComposer.setSize(halfWidth, halfHeight);
         }
     }
 
     dispose() {
+        // Log du temps de vie total
         const endTime = performance.now();
         const totalLifetime = endTime - this.startTime;
         console.log(`Total renderer lifetime: ${totalLifetime}ms`);
 
-        if (this.renderTarget) {
-            this.renderTarget.dispose();
-        }
-        if (this.persistenceTargets[0]) {
-            this.persistenceTargets[0].dispose();
-        }
-        if (this.persistenceTargets[1]) {
-            this.persistenceTargets[1].dispose();
-        }
-        if (this.composer) {
-            this.composer.renderTarget1.dispose();
-            this.composer.renderTarget2.dispose();
+        // Nettoyage des render targets
+        const renderTargets = [
+            this.mainRenderTarget,
+            this.postRenderTarget,
+            ...this.persistenceTargets
+        ];
+        
+        renderTargets.forEach(target => {
+            if (target) target.dispose();
+        });
+
+        // Nettoyage des composers et leurs render targets
+        [this.mainComposer, this.postComposer].forEach(composer => {
+            if (composer) {
+                composer.renderTarget1.dispose();
+                composer.renderTarget2.dispose();
+            }
+        });
+
+        // Nettoyage des textures spéciales
+        if (this.trigLUT) {
+            this.trigLUT.dispose();
         }
 
-        // Clean up des éléments de ping-pong
+        // Nettoyage des éléments de ping-pong
         if (this.pingPongQuad) {
             this.pingPongQuad.geometry.dispose();
             this.pingPongQuad.material.dispose();
         }
-        
-        // Nettoyage final du renderer
+
+        // Nettoyage final du renderer WebGL
         this.renderer.dispose();
     }
+
+    // Dans la classe Renderer
+setLuminance(value) {
+    if (this.crtPass) {
+      this.crtPass.uniforms.luminanceBase.value = value;
+    }
+  }
+  
+  setDistortion(value) {
+    if (this.crtPass) {
+      this.crtPass.uniforms.distortionIntensity.value = value;
+    }
+  }
+  
+  setAberration(value) {
+    if (this.chromaticAberrationPass) {
+      this.chromaticAberrationPass.uniforms.aberrationIntensity.value = value;
+    }
+  }
+  
+  setScanlines(intensity, count, speed) {
+    // Votre méthode existante, à garder
+  }
+  
+  setGlow(radius, intensity, persistence) {
+    // Votre méthode existante, à garder
+  }
 }

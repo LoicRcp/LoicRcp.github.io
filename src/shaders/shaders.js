@@ -1,3 +1,49 @@
+// Shaders de sampling
+export const downsampleFragmentShader = `
+    precision mediump float;
+    
+    uniform sampler2D tDiffuse;
+    uniform vec2 resolution;
+    varying vec2 vUv;
+
+    void main() {
+        vec2 texelSize = 1.0 / resolution;
+        vec4 color = texture2D(tDiffuse, vUv);
+        color += texture2D(tDiffuse, vUv + vec2(texelSize.x * 0.5, 0.0));
+        color += texture2D(tDiffuse, vUv + vec2(0.0, texelSize.y * 0.5));
+        color += texture2D(tDiffuse, vUv + vec2(texelSize.x * 0.5, texelSize.y * 0.5));
+        gl_FragColor = color / 4.0;
+    }
+`;
+
+export const upsampleFragmentShader = `
+    precision mediump float;
+    
+    uniform sampler2D tDiffuse;
+    uniform vec2 resolution;
+    varying vec2 vUv;
+
+    void main() {
+        // Calcul des coordonnées de texture pour l'interpolation
+        vec2 texelSize = 1.0 / resolution;
+        vec2 tl = vec2(-0.5, -0.5);
+        vec2 tr = vec2(0.5, -0.5);
+        vec2 bl = vec2(-0.5, 0.5);
+        vec2 br = vec2(0.5, 0.5);
+        
+        // Échantillonnage des quatre texels voisins
+        vec4 s1 = texture2D(tDiffuse, vUv + texelSize * tl);
+        vec4 s2 = texture2D(tDiffuse, vUv + texelSize * tr);
+        vec4 s3 = texture2D(tDiffuse, vUv + texelSize * bl);
+        vec4 s4 = texture2D(tDiffuse, vUv + texelSize * br);
+        
+        // Interpolation bilinéaire
+        vec4 result = (s1 + s2 + s3 + s4) * 0.25;
+        
+        gl_FragColor = result;
+    }
+`;
+
 // Vertex shader de base utilisé par la plupart des passes
 export const baseVertexShader = `
     varying vec2 vUv;
@@ -10,6 +56,8 @@ export const baseVertexShader = `
 
 // Shader de luminance basique
 export const luminanceFragmentShader = `
+    precision mediump float;
+    
     uniform sampler2D tDiffuse;
     uniform float luminanceBase;
     varying vec2 vUv;
@@ -21,58 +69,56 @@ export const luminanceFragmentShader = `
     }
 `;
 
-// Shader de distortion CRT
+// Shader combinant luminance et distortion CRT - optimisé
 export const crtDistortionFragmentShader = `
+    precision mediump float;
+    
     uniform sampler2D tDiffuse;
     uniform float distortionIntensity;
+    uniform float luminanceBase;
     uniform vec2 resolution;
     varying vec2 vUv;
 
-    vec2 computeDistortion(vec2 coord) {
-        vec2 cc = coord * 2.0 - 1.0;
-        float dist = dot(cc, cc);
-        vec2 distorted = coord + cc * (dist * distortionIntensity);
-        return distorted;
-    }
-
     void main() {
-        vec2 distortedUv = computeDistortion(vUv);
+        // Calcul simplifié de la distortion
+        vec2 cc = vUv * 2.0 - 1.0;
+        float dist = dot(cc, cc) * distortionIntensity * 0.1;
+        vec2 distortedUv = vUv + cc * dist;
         
-        if (distortedUv.x < 0.0 || distortedUv.x > 1.0 || 
-            distortedUv.y < 0.0 || distortedUv.y > 1.0) {
-            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-            return;
-        }
+        // Fondu simplifié aux bords
+        vec2 e = abs(distortedUv - 0.5) * 2.0;
+        float fade = 1.0 - max(e.x, e.y);
+        fade = clamp(fade, 0.0, 1.0);
         
+        // Application de la distortion et luminance
         vec4 texel = texture2D(tDiffuse, distortedUv);
-        gl_FragColor = texel;
+        vec3 color = max(texel.rgb * fade, vec3(luminanceBase));
+        
+        gl_FragColor = vec4(color, texel.a * fade);
     }
 `;
 
-// Shader d'aberration chromatique
+// Shader d'aberration chromatique - version simplifiée
 export const chromaticAberrationFragmentShader = `
+    precision mediump float;
+    
     uniform sampler2D tDiffuse;
     uniform float aberrationIntensity;
+    uniform vec2 resolution;
     varying vec2 vUv;
 
     void main() {
-        vec2 center = vec2(0.5);
-        vec2 coord = vUv - center;
+        // Simplification: utilisation directe des coordonnées relatives au centre
+        vec2 coord = (vUv - 0.5) * 2.0;
         
-        float dist = length(coord);
-        vec2 direction = dist > 0.0 ? coord / dist : vec2(0.0);
+        // Offset fixe multiplié par la distance au centre approximée
+        float dist = dot(coord, coord);
+        vec2 offset = coord * (aberrationIntensity * 0.001);
         
-        float redOffset = aberrationIntensity * 0.004;
-        float blueOffset = aberrationIntensity * -0.004;
-        
-        vec2 redUV = vUv + direction * redOffset * dist;
-        vec2 blueUV = vUv + direction * blueOffset * dist;
-        
-        vec2 greenUV = vUv;
-        
-        float r = texture2D(tDiffuse, redUV).r;
-        float g = texture2D(tDiffuse, greenUV).g;
-        float b = texture2D(tDiffuse, blueUV).b;
+        // Sampling des canaux avec offsets simplifiés
+        float r = texture2D(tDiffuse, vUv + offset).r;
+        float b = texture2D(tDiffuse, vUv - offset).b;
+        float g = texture2D(tDiffuse, vUv).g;
         
         gl_FragColor = vec4(r, g, b, 1.0);
     }
@@ -80,18 +126,21 @@ export const chromaticAberrationFragmentShader = `
 
 // Shader des scanlines
 export const scanlinesFragmentShader = `
+    precision mediump float;
+    
     uniform sampler2D tDiffuse;
     uniform float time;
     uniform vec2 resolution;
-uniform float scanlineIntensity;  // Intensité des lignes
+    uniform float scanlineIntensity;  // Intensité des lignes
     uniform float scanlineCount;      // Nombre de lignes
     uniform float scanlineSpeed;      // Vitesse de défilement
     varying vec2 vUv;
-
-    // Fonction de bruit pseudo-aléatoire
-    float rand(float n) {
-        return fract(sin(n) * 43758.5453123);
-    }
+    
+    // Table de lookup précalculée pour les valeurs aléatoires 
+    // Plus efficace que le calcul dynamique
+    const float noiseValues[4] = float[4](
+        0.5, 0.75, 0.25, 0.125
+    );
 
     void main() {
         // Paramètres de base des scanlines
@@ -103,50 +152,50 @@ uniform float scanlineIntensity;  // Intensité des lignes
         // Motif de base des scanlines
         float scanlinePattern = sin(scanlinePos * 3.1415926535897932384626433832795);
         
-        // Ajout d'une variation aléatoire pour le scintillement
-        float flickering = mix(1.0, rand(time * 0.01), 0.05);
+        // Calcul optimisé de l'intensité des scanlines
+        float scanlineEffect = 1.0 - (0.5 + 0.5 * scanlinePattern) * scanlineIntensity;
         
-        // Calcul de l'intensité finale des scanlines
-        float scanlineEffect = 1.0 - (scanlinePattern * scanlinePattern * scanlineIntensity * flickering);
+        // Utilisation de la table de lookup pour le scintillement
+        float noiseIndex = mod(floor(time * 10.0), 4.0);
+        float flicker = noiseValues[int(noiseIndex)];
         
         // Application de la variation de luminosité
         vec4 texel = texture2D(tDiffuse, vUv);
-        vec3 color = texel.rgb * scanlineEffect;
-        
-        // Boost légèrement la luminosité des lignes claires pour compenser l'assombrissement
-        color *= 1.0 + (1.0 - scanlineEffect) * 0.2;
+        vec3 color = texel.rgb * mix(1.0, scanlineEffect, flicker * 0.15);
         
         gl_FragColor = vec4(color, texel.a);
     }
 `;
 
 export const glowHorizontalFragmentShader = `
+    precision mediump float;
+    
     uniform sampler2D tDiffuse;
     uniform float glowRadius;
     uniform float glowIntensity;
     uniform vec2 resolution;
     varying vec2 vUv;
 
-    // Poids gaussiens pour 3 échantillons
-    const float weights[3] = float[3](0.4026, 0.2442, 0.0545);
+    // Poids gaussiens réduits à 2 échantillons
+    const float weights[2] = float[2](0.5, 0.25);
 
     void main() {
         vec2 texel = vec2(1.0 / resolution.x, 1.0 / resolution.y);
         vec3 result = texture2D(tDiffuse, vUv).rgb * weights[0];
         
-        // Échantillonnage horizontal
-        for(int i = 1; i < 3; i++) {
-            vec2 offset = vec2(texel.x * float(i) * glowRadius, 0.0);
-            result += texture2D(tDiffuse, vUv + offset).rgb * weights[i];
-            result += texture2D(tDiffuse, vUv - offset).rgb * weights[i];
-        }
+        // Échantillonnage horizontal réduit
+        vec2 offset = vec2(texel.x * glowRadius, 0.0);
+        result += texture2D(tDiffuse, vUv + offset).rgb * weights[1];
+        result += texture2D(tDiffuse, vUv - offset).rgb * weights[1];
         
-        gl_FragColor = vec4(result, 1.0);
+        gl_FragColor = vec4(result * glowIntensity, 1.0);
     }
 `;
 
-// Passe verticale du glow gaussien avec persistence
+// Passe verticale du glow gaussien avec persistence - optimisé
 export const glowVerticalFragmentShader = `
+    precision mediump float;
+    
     uniform sampler2D tDiffuse;
     uniform sampler2D tPersistence; // Texture de la frame précédente
     uniform float glowRadius;
@@ -155,37 +204,28 @@ export const glowVerticalFragmentShader = `
     uniform vec2 resolution;
     varying vec2 vUv;
 
-    // Poids gaussiens pour 5 échantillons
-    const float weights[3] = float[3](0.4026, 0.2442, 0.0545);
+    // Poids gaussiens réduits à 2 échantillons
+    const float weights[2] = float[2](0.5, 0.25);
 
-    // Fonction pour ajuster la persistence selon la couleur
-    // Les phosphores réels ont des taux de décroissance différents selon la couleur
+    // Fonction simplifiée pour ajuster la persistence
     vec3 adjustPersistence(vec3 color) {
-        return vec3(
-            color.r * 0.95,  // Rouge décroit un peu plus vite
-            color.g * 0.97,  // Vert persiste un peu plus
-            color.b * 0.93   // Bleu décroit le plus vite
-        );
+        return color * vec3(0.95, 0.97, 0.93);
     }
 
     void main() {
         vec2 texel = vec2(1.0 / resolution.x, 1.0 / resolution.y);
         vec3 result = texture2D(tDiffuse, vUv).rgb * weights[0];
         
-        // Échantillonnage vertical
-        for(int i = 1; i < 3; i++) {
-            vec2 offset = vec2(0.0, texel.y * float(i) * glowRadius);
-            result += texture2D(tDiffuse, vUv + offset).rgb * weights[i];
-            result += texture2D(tDiffuse, vUv - offset).rgb * weights[i];
-        }
+        // Échantillonnage vertical réduit
+        vec2 offset = vec2(0.0, texel.y * glowRadius);
+        result += texture2D(tDiffuse, vUv + offset).rgb * weights[1];
+        result += texture2D(tDiffuse, vUv - offset).rgb * weights[1];
         
-        // Ajout de la persistence
+        // Persistence et mélange optimisés
         vec3 oldColor = texture2D(tPersistence, vUv).rgb;
-        vec3 persistentColor = adjustPersistence(oldColor) * persistence;
+        vec3 persistentColor = adjustPersistence(oldColor);
+        vec3 finalColor = mix(result, persistentColor * persistence, persistence);
         
-        // Mélange du glow actuel avec la persistence
-        vec3 finalColor = mix(result, persistentColor, persistence);
-        finalColor *= glowIntensity;        
-        gl_FragColor = vec4(finalColor, 1.0);
+        gl_FragColor = vec4(finalColor * glowIntensity, 1.0);
     }
 `;

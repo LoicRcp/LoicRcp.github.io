@@ -14,6 +14,20 @@ const Scene = () => {
     const customPanelRef = useRef(null);
 
     useEffect(() => {
+        // Debug
+        console.log('Canvas:', canvasRef.current);
+        if (!canvasRef.current) {
+            console.error('Canvas not ready');
+            return;
+        }
+
+        const gl = canvasRef.current.getContext('webgl2') || canvasRef.current.getContext('webgl');
+        if (!gl) {
+            console.error('WebGL not supported');
+            return;
+        }
+        console.log('WebGL Context:', gl);
+
         // Initialisation des stats
         const stats = new Stats();
         stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
@@ -47,9 +61,20 @@ const Scene = () => {
         scene.background = new THREE.Color(0x000000);
 
         // Configuration de la caméra
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 5;
+        const aspect = window.innerWidth / window.innerHeight;
+        const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+        camera.position.set(0, 0, 5);
+        camera.lookAt(0, 0, 0);
         cameraRef.current = camera;
+
+        // Debug camera
+        console.log('Camera config:', {
+            fov: camera.fov,
+            aspect: camera.aspect,
+            position: camera.position.toArray(),
+            near: camera.near,
+            far: camera.far
+        });
 
         // Ajout d'un cube pour test
         const geometry = new THREE.BoxGeometry();
@@ -74,9 +99,6 @@ const Scene = () => {
         const renderer = new Renderer(canvasRef.current);
         rendererRef.current = renderer;
         renderer.init(scene, camera);
-        renderer.setLuminance(0.1)
-        renderer.setDistortion(0.05)
-        renderer.setAberration(3)
         renderer.setScanlines(0.3, 100, 2.0);
         renderer.setGlow(1.5, 0.5, 0.85);
 
@@ -173,7 +195,7 @@ const Scene = () => {
         };
     }, []);
 
-    return <canvas ref={canvasRef} className="w-full h-full" />;
+    return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full bg-black" />;
 };
 
 export default Scene;
