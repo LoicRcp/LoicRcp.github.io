@@ -5,6 +5,7 @@ import { Renderer } from '../../pipeline/renderer';
 import EffectControls from '../Controls/EffectControls';
 import { TerminalPlane } from '../Terminal/TerminalPlane';
 import { sections } from '../Terminal/sections';
+import { CreativeAnimation } from "../3d/creativeAnimation"
 
 const Scene = () => {
     const terminalRef = useRef(null);
@@ -109,6 +110,11 @@ const Scene = () => {
         terminalRef.current = terminal;
         scene.add(terminal.mesh);
 
+
+        const creativeAnimation = new CreativeAnimation();
+        scene.add(creativeAnimation.mesh);
+
+        /*
         // Ajout du cube
         const geometry = new THREE.BoxGeometry();
         const material = new THREE.MeshBasicMaterial({ 
@@ -122,12 +128,15 @@ const Scene = () => {
         const cube = new THREE.Mesh(geometry, material);
         cube.position.x = 4; // Position dans la moitié droite
         scene.add(cube);
-
+        */
         // Animation du cube
+
+        /*
         const animateCube = () => {
             cube.rotation.x += 0.01;
             cube.rotation.y += 0.01;
         };
+        */
 
         // Création du renderer
         const renderer = new Renderer(canvasRef.current);
@@ -142,7 +151,8 @@ const Scene = () => {
             
             stats.begin();
             
-            animateCube();
+            //animateCube();
+            creativeAnimation.update(performance.now() * 0.001);
             renderer.render();
             
             // Mise à jour du panel personnalisé avec les mesures de performance
@@ -168,6 +178,7 @@ const Scene = () => {
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
             renderer.setSize(width, height);
+            creativeAnimation.setResolution(width, height);
         };
         window.addEventListener('resize', handleResize);
 
@@ -193,6 +204,9 @@ const Scene = () => {
             }
             if (rendererRef.current) {
                 rendererRef.current.dispose();
+            }
+            if (creativeAnimation) {
+                creativeAnimation.dispose();
             }
             
             // Vider la scène
