@@ -28,6 +28,49 @@ const EffectGroup = ({ title, children }) => (
 
 const EffectControls = ({ renderer, enabledPasses, onTogglePass }) => {
   const [activeTab, setActiveTab] = React.useState('base');
+  const [values, setValues] = React.useState({
+    luminance: defaultConfig.luminance.base,
+    distortion: defaultConfig.distortion.intensity,
+    aberration: defaultConfig.aberration.intensity,
+    scanlines: {
+      intensity: defaultConfig.scanlines.intensity,
+      count: defaultConfig.scanlines.count,
+      speed: defaultConfig.scanlines.speed
+    },
+    glow: {
+      radius: defaultConfig.glow.radius,
+      intensity: defaultConfig.glow.intensity,
+      persistence: defaultConfig.glow.persistence
+    }
+  });
+
+  // Mise à jour des valeurs depuis les uniforms à chaque frame
+  React.useEffect(() => {
+    const updateValues = () => {
+      setValues({
+        luminance: renderer.luminancePass?.uniforms.luminanceBase.value ?? defaultConfig.luminance.base,
+        distortion: renderer.distortionPass?.uniforms.distortionIntensity.value ?? defaultConfig.distortion.intensity,
+        aberration: renderer.chromaticAberrationPass?.uniforms.aberrationIntensity.value ?? defaultConfig.aberration.intensity,
+        scanlines: {
+          intensity: renderer.scanlinesPass?.uniforms.scanlineIntensity.value ?? defaultConfig.scanlines.intensity,
+          count: renderer.scanlinesPass?.uniforms.scanlineCount.value ?? defaultConfig.scanlines.count,
+          speed: renderer.scanlinesPass?.uniforms.scanlineSpeed.value ?? defaultConfig.scanlines.speed
+        },
+        glow: {
+          radius: renderer.glowHorizontalPass?.uniforms.glowRadius.value ?? defaultConfig.glow.radius,
+          intensity: renderer.glowHorizontalPass?.uniforms.glowIntensity.value ?? defaultConfig.glow.intensity,
+          persistence: renderer.glowVerticalPass?.uniforms.persistence.value ?? defaultConfig.glow.persistence
+        }
+      });
+    };
+
+    const frameId = requestAnimationFrame(function update() {
+      updateValues();
+      requestAnimationFrame(update);
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [renderer]);
 
   const handleLuminanceChange = (value) => {
     renderer.setLuminance(value);
@@ -107,11 +150,11 @@ const EffectControls = ({ renderer, enabledPasses, onTogglePass }) => {
               />
             </div>
             <ControlSlider
-              label="Base"
-              value={renderer.luminancePass?.uniforms.luminanceBase.value ?? defaultConfig.luminance.base}
-              onChange={handleLuminanceChange}
-              min={defaultConfig.luminance.min}
-              max={defaultConfig.luminance.max}
+            label="Base"
+            value={values.luminance}
+            onChange={handleLuminanceChange}
+            min={defaultConfig.luminance.min}
+            max={defaultConfig.luminance.max}
             />
           </EffectGroup>
 
@@ -126,11 +169,11 @@ const EffectControls = ({ renderer, enabledPasses, onTogglePass }) => {
               />
             </div>
             <ControlSlider
-              label="Intensity"
-              value={renderer.distortionPass?.uniforms.distortionIntensity.value ?? defaultConfig.distortion.intensity}
-              onChange={handleDistortionChange}
-              min={defaultConfig.distortion.min}
-              max={defaultConfig.distortion.max}
+            label="Intensity"
+            value={values.distortion}
+            onChange={handleDistortionChange}
+            min={defaultConfig.distortion.min}
+            max={defaultConfig.distortion.max}
             />
           </EffectGroup>
 
@@ -145,11 +188,11 @@ const EffectControls = ({ renderer, enabledPasses, onTogglePass }) => {
               />
             </div>
             <ControlSlider
-              label="Intensity"
-              value={renderer.chromaticAberrationPass?.uniforms.aberrationIntensity.value ?? defaultConfig.aberration.intensity}
-              onChange={handleAberrationChange}
-              min={defaultConfig.aberration.min}
-              max={defaultConfig.aberration.max}
+            label="Intensity"
+            value={values.aberration}
+            onChange={handleAberrationChange}
+            min={defaultConfig.aberration.min}
+            max={defaultConfig.aberration.max}
             />
           </EffectGroup>
         </>
@@ -169,14 +212,14 @@ const EffectControls = ({ renderer, enabledPasses, onTogglePass }) => {
           <div className="space-y-4">
             <ControlSlider
               label="Intensity"
-              value={renderer.scanlinesPass?.uniforms.scanlineIntensity.value ?? defaultConfig.scanlines.intensity}
+              value={values.scanlines.intensity}
               onChange={(v) => handleScanlinesChange('intensity', v)}
               min={defaultConfig.scanlines.intensityLimits.min}
               max={defaultConfig.scanlines.intensityLimits.max}
             />
             <ControlSlider
               label="Count"
-              value={renderer.scanlinesPass?.uniforms.scanlineCount.value ?? defaultConfig.scanlines.count}
+              value={values.scanlines.count}
               onChange={(v) => handleScanlinesChange('count', v)}
               min={defaultConfig.scanlines.countLimits.min}
               max={defaultConfig.scanlines.countLimits.max}
@@ -184,7 +227,7 @@ const EffectControls = ({ renderer, enabledPasses, onTogglePass }) => {
             />
             <ControlSlider
               label="Speed"
-              value={renderer.scanlinesPass?.uniforms.scanlineSpeed.value ?? defaultConfig.scanlines.speed}
+              value={values.scanlines.speed}
               onChange={(v) => handleScanlinesChange('speed', v)}
               min={defaultConfig.scanlines.speedLimits.min}
               max={defaultConfig.scanlines.speedLimits.max}
@@ -207,21 +250,21 @@ const EffectControls = ({ renderer, enabledPasses, onTogglePass }) => {
           <div className="space-y-4">
             <ControlSlider
               label="Radius"
-              value={renderer.glowHorizontalPass?.uniforms.glowRadius.value ?? defaultConfig.glow.radius}
+              value={values.glow.radius}
               onChange={(v) => handleGlowChange('radius', v)}
               min={defaultConfig.glow.radiusLimits.min}
               max={defaultConfig.glow.radiusLimits.max}
             />
             <ControlSlider
               label="Intensity"
-              value={renderer.glowHorizontalPass?.uniforms.glowIntensity.value ?? defaultConfig.glow.intensity}
+              value={values.glow.intensity}
               onChange={(v) => handleGlowChange('intensity', v)}
               min={defaultConfig.glow.intensityLimits.min}
               max={defaultConfig.glow.intensityLimits.max}
             />
             <ControlSlider
               label="Persistence"
-              value={renderer.glowVerticalPass?.uniforms.persistence.value ?? defaultConfig.glow.persistence}
+              value={values.glow.persistence}
               onChange={(v) => handleGlowChange('persistence', v)}
               min={defaultConfig.glow.persistenceLimits.min}
               max={defaultConfig.glow.persistenceLimits.max}
