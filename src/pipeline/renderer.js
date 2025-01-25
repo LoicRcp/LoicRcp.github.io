@@ -78,6 +78,7 @@ export class Renderer {
 
         // Options pour les render targets du glow
         const glowTargetOptions = {
+            type: THREE.FloatType,
             minFilter: THREE.LinearFilter,
             magFilter: THREE.LinearFilter,
             format: THREE.RGBAFormat,
@@ -295,6 +296,9 @@ export class Renderer {
             this.pingPongQuad.material.map = this.composer.renderTarget2.texture;
             this.pingPongQuad.material.needsUpdate = true;
             
+            this.renderer.render(this.pingPongScene, this.pingPongCamera);
+            this.pingPongQuad.material.map = this.persistenceTargets[this.currentPersistenceTarget].texture;
+
             this.renderer.render(this.pingPongScene, this.pingPongCamera);
             this.currentPersistenceTarget = 1 - this.currentPersistenceTarget;
     

@@ -8,15 +8,34 @@ export const baseVertexShader = `
     }
 `;
 
-// Shader de luminance basique
+// Shader de luminance amélioré avec vignettage et ambiance rétro
 export const luminanceFragmentShader = `
     uniform sampler2D tDiffuse;
     uniform float luminanceBase;
     varying vec2 vUv;
 
     void main() {
+        // Effet de vignettage
+        vec2 center = vUv - 0.5;
+        float vignette = 1.0 - dot(center, center) * 1.2;
+        vignette = smoothstep(0.0, 1.0, vignette);
+
         vec4 texel = texture2D(tDiffuse, vUv);
+        
+        // Ajustement du contraste
         vec3 color = max(texel.rgb, vec3(luminanceBase));
+        color = pow(color, vec3(1.1)); // Augmente légèrement le contraste
+
+        // Légère teinte verdâtre pour l'ambiance phosphore
+        vec3 tint = vec3(0.85, 1.05, 0.9);
+        color *= tint;
+
+        // Application du vignettage
+        color *= vignette;
+
+        // Léger boost de luminosité au centre
+        color *= 1.0 + (vignette * 0.2);
+
         gl_FragColor = vec4(color, texel.a);
     }
 `;
@@ -162,9 +181,9 @@ export const glowVerticalFragmentShader = `
     // Les phosphores réels ont des taux de décroissance différents selon la couleur
     vec3 adjustPersistence(vec3 color) {
         return vec3(
-            color.r * 0.95,  // Rouge décroit un peu plus vite
-            color.g * 0.97,  // Vert persiste un peu plus
-            color.b * 0.93   // Bleu décroit le plus vite
+            color.r * 0.97,  // Rouge décroit un peu plus vite
+            color.g * 0.98,  // Vert persiste un peu plus
+            color.b * 0.96   // Bleu décroit le plus vite
         );
     }
 
@@ -181,10 +200,10 @@ export const glowVerticalFragmentShader = `
         
         // Ajout de la persistence
         vec3 oldColor = texture2D(tPersistence, vUv).rgb;
-        vec3 persistentColor = adjustPersistence(oldColor) * persistence;
+        vec3 persistentColor = adjustPersistence(oldColor);
         
         // Mélange du glow actuel avec la persistence
-        vec3 finalColor = mix(result, persistentColor, persistence);
+        vec3 finalColor = result + persistentColor * persistence; 
         finalColor *= glowIntensity;        
         gl_FragColor = vec4(finalColor, 1.0);
     }

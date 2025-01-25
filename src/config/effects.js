@@ -1,7 +1,7 @@
 // Configuration par défaut des effets CRT
 export const DEFAULT_EFFECTS_CONFIG = {
     luminance: {
-        base: 0.1,
+        base: 0.20, // Réduit pour plus de contraste
         min: 0.0,
         max: 1.0
     },
@@ -25,9 +25,9 @@ export const DEFAULT_EFFECTS_CONFIG = {
         speedLimits: { min: 0.0, max: 5.0 }
     },
     glow: {
-        radius: 1.0,
-        intensity: 0.3,  // Réduit de 0.5 à 0.3
-        persistence: 0.85,
+        radius: 0.35,       // Augmenté pour un effet plus large
+        intensity: 0.8,    // Augmenté pour un effet plus visible
+        persistence: 0.7,  // Réduit pour moins d'étalement temporel
         // Contraintes
         radiusLimits: { min: 0.0, max: 5.0 },
         intensityLimits: { min: 0.0, max: 1.0 },
