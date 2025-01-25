@@ -3,8 +3,49 @@ import * as THREE from 'three';
 import Stats from 'three/examples/jsm/libs/stats.module';
 import { Renderer } from '../../pipeline/renderer';
 import EffectControls from '../Controls/EffectControls';
+import { TerminalPlane } from '../Terminal/TerminalPlane';
+import { sections } from '../Terminal/sections';
 
 const Scene = () => {
+    const terminalRef = useRef(null);
+    const [currentSection, setCurrentSection] = useState(0);
+    const [displayedText, setDisplayedText] = useState('');
+
+    // Hook typewriter pour le terminal Three.js
+    useEffect(() => {
+        let index = 0;
+        const section = sections[currentSection];
+        
+        const timer = setInterval(() => {
+            if (index < section.length) {
+                const newText = section.substring(0, index + 1);
+                setDisplayedText(newText);
+                if (terminalRef.current) {
+                    terminalRef.current.updateText(newText);
+                }
+                index++;
+            } else {
+                clearInterval(timer);
+            }
+        }, 50);
+
+        return () => clearInterval(timer);
+    }, [currentSection]);
+
+    // Navigation par touche Entrée
+    useEffect(() => {
+        const handleKeyPress = (event) => {
+            if (event.key === 'Enter' && displayedText.length === sections[currentSection].length) {
+                if (currentSection < sections.length - 1) {
+                    setCurrentSection(prev => prev + 1);
+                    setDisplayedText('');
+                }
+            }
+        };
+
+        window.addEventListener('keypress', handleKeyPress);
+        return () => window.removeEventListener('keypress', handleKeyPress);
+    }, [currentSection, displayedText]);
     const canvasRef = useRef(null);
     const rendererRef = useRef(null);
     const sceneRef = useRef(null);
@@ -62,7 +103,13 @@ const Scene = () => {
         camera.position.z = 5;
         cameraRef.current = camera;
 
-        // Ajout d'un cube pour test
+        // Création du terminal
+        const terminal = new TerminalPlane(8, 6);
+        terminal.setPosition(-4, 0, 0); // Position dans la moitié gauche
+        terminalRef.current = terminal;
+        scene.add(terminal.mesh);
+
+        // Ajout du cube
         const geometry = new THREE.BoxGeometry();
         const material = new THREE.MeshBasicMaterial({ 
             color: 0xffffff, 
@@ -73,6 +120,7 @@ const Scene = () => {
         materialRef.current = material;
         
         const cube = new THREE.Mesh(geometry, material);
+        cube.position.x = 4; // Position dans la moitié droite
         scene.add(cube);
 
         // Animation du cube
@@ -134,6 +182,9 @@ const Scene = () => {
             }
             
             // Cleanup Three.js resources
+            if (terminalRef.current) {
+                terminalRef.current.dispose();
+            }
             if (geometryRef.current) {
                 geometryRef.current.dispose();
             }
@@ -154,6 +205,7 @@ const Scene = () => {
     return (
         <div className="relative w-full h-full">
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+            {/* Le terminal est maintenant un objet Three.js */}
             {isRendererReady && (
                 <EffectControls
                     renderer={rendererRef.current}
