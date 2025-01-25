@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { DEFAULT_EFFECTS_CONFIG as config, clampValue } from '../config/effects';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
@@ -113,7 +114,7 @@ export class Renderer {
         const luminanceShader = {
             uniforms: {
                 tDiffuse: { value: null },
-                luminanceBase: { value: 0.05 }
+                luminanceBase: { value: config.luminance.base }
             },
             vertexShader: baseVertexShader,
             fragmentShader: luminanceFragmentShader
@@ -125,7 +126,7 @@ export class Renderer {
         const distortionShader = {
             uniforms: {
                 tDiffuse: { value: null },
-                distortionIntensity: { value: 0.3 },
+                distortionIntensity: { value: config.distortion.intensity },
                 resolution: { 
                     value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
                 }
@@ -140,7 +141,7 @@ export class Renderer {
         const chromaticAberrationShader = {
             uniforms: {
                 tDiffuse: { value: null },
-                aberrationIntensity: { value: 3.0 }
+                aberrationIntensity: { value: config.aberration.intensity }
             },
             vertexShader: baseVertexShader,
             fragmentShader: chromaticAberrationFragmentShader
@@ -156,9 +157,9 @@ export class Renderer {
                 resolution: { 
                     value: new THREE.Vector2(window.innerWidth, window.innerHeight) 
                 },
-                scanlineIntensity: { value: 0.3 },
-                scanlineCount: { value: 100.0 },
-                scanlineSpeed: { value: 2.0 }
+                scanlineIntensity: { value: config.scanlines.intensity },
+                scanlineCount: { value: config.scanlines.count },
+                scanlineSpeed: { value: config.scanlines.speed }
             },
             vertexShader: baseVertexShader,
             fragmentShader: scanlinesFragmentShader
@@ -170,8 +171,8 @@ export class Renderer {
         const glowHorizontalShader = {
             uniforms: {
                 tDiffuse: { value: null },
-                glowRadius: { value: 2.0 },
-                glowIntensity: { value: 0.5 },
+                glowRadius: { value: config.glow.radius },
+                glowIntensity: { value: config.glow.intensity },
                 resolution: { 
                     value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) 
                 }
@@ -186,9 +187,9 @@ export class Renderer {
             uniforms: {
                 tDiffuse: { value: null },
                 tPersistence: { value: this.persistenceTargets[0].texture },
-                glowRadius: { value: 2.0 },
-                glowIntensity: { value: 0.5 },
-                persistence: { value: 0.9 },
+                glowRadius: { value: config.glow.radius },
+                glowIntensity: { value: config.glow.intensity },
+                persistence: { value: config.glow.persistence },
                 resolution: { 
                     value: new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) 
                 }
@@ -205,13 +206,15 @@ export class Renderer {
 
     setLuminance(value) {
         if (this.luminancePass) {
-            this.luminancePass.uniforms.luminanceBase.value = value;
+            const { min, max } = config.luminance;
+            this.luminancePass.uniforms.luminanceBase.value = clampValue(value, min, max);
         }
     }
 
     setDistortion(value) {
         if (this.distortionPass) {
-            this.distortionPass.uniforms.distortionIntensity.value = value;
+            const { min, max } = config.distortion;
+            this.distortionPass.uniforms.distortionIntensity.value = clampValue(value, min, max);
         }
     }
 
@@ -223,30 +226,40 @@ export class Renderer {
 
     setScanlines(intensity, count, speed) {
         if (this.scanlinesPass) {
+            const { intensityLimits, countLimits, speedLimits } = config.scanlines;
+            
             if (intensity !== undefined) {
-                this.scanlinesPass.uniforms.scanlineIntensity.value = intensity;
+                this.scanlinesPass.uniforms.scanlineIntensity.value = 
+                    clampValue(intensity, intensityLimits.min, intensityLimits.max);
             }
             if (count !== undefined) {
-                this.scanlinesPass.uniforms.scanlineCount.value = count;
+                this.scanlinesPass.uniforms.scanlineCount.value = 
+                    clampValue(count, countLimits.min, countLimits.max);
             }
             if (speed !== undefined) {
-                this.scanlinesPass.uniforms.scanlineSpeed.value = speed;
+                this.scanlinesPass.uniforms.scanlineSpeed.value = 
+                    clampValue(speed, speedLimits.min, speedLimits.max);
             }
         }
     }
 
     setGlow(radius, intensity, persistence) {
         if (this.glowHorizontalPass && this.glowVerticalPass) {
+            const { radiusLimits, intensityLimits, persistenceLimits } = config.glow;
+            
             if (radius !== undefined) {
-                this.glowHorizontalPass.uniforms.glowRadius.value = radius;
-                this.glowVerticalPass.uniforms.glowRadius.value = radius;
+                const clampedRadius = clampValue(radius, radiusLimits.min, radiusLimits.max);
+                this.glowHorizontalPass.uniforms.glowRadius.value = clampedRadius;
+                this.glowVerticalPass.uniforms.glowRadius.value = clampedRadius;
             }
             if (intensity !== undefined) {
-                this.glowHorizontalPass.uniforms.glowIntensity.value = intensity;
-                this.glowVerticalPass.uniforms.glowIntensity.value = intensity;
+                const clampedIntensity = clampValue(intensity, intensityLimits.min, intensityLimits.max);
+                this.glowHorizontalPass.uniforms.glowIntensity.value = clampedIntensity;
+                this.glowVerticalPass.uniforms.glowIntensity.value = clampedIntensity;
             }
             if (persistence !== undefined) {
-                this.glowVerticalPass.uniforms.persistence.value = persistence;
+                this.glowVerticalPass.uniforms.persistence.value = 
+                    clampValue(persistence, persistenceLimits.min, persistenceLimits.max);
             }
         }
     }

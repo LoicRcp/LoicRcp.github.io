@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import Stats from 'three/examples/jsm/libs/stats.module';
 import { Renderer } from '../../pipeline/renderer';
+import EffectControls from '../Controls/EffectControls';
 
 const Scene = () => {
     const canvasRef = useRef(null);
@@ -12,6 +13,27 @@ const Scene = () => {
     const materialRef = useRef(null);
     const statsRef = useRef(null);
     const customPanelRef = useRef(null);
+
+    const [isRendererReady, setIsRendererReady] = useState(false);
+
+    // State pour les passes activées
+    const [enabledPasses, setEnabledPasses] = useState({
+        luminance: true,
+        distortion: true,
+        aberration: true,
+        scanlines: true,
+        glow: true
+    });
+
+    const handleTogglePass = (pass, enabled) => {
+        setEnabledPasses(prev => {
+            const newState = { ...prev, [pass]: enabled };
+            if (rendererRef.current) {
+                rendererRef.current.enabledPasses = newState;
+            }
+            return newState;
+        });
+    };
 
     useEffect(() => {
         // Initialisation des stats
@@ -29,17 +51,6 @@ const Scene = () => {
         stats.dom.style.top = '0px';
         document.body.appendChild(stats.dom);
         statsRef.current = stats;
-
-        // Création du panneau de contrôle
-        const controlPanel = document.createElement('div');
-        controlPanel.style.position = 'absolute';
-        controlPanel.style.left = '10px';
-        controlPanel.style.top = '110px';
-        controlPanel.style.backgroundColor = 'rgba(0,0,0,0.7)';
-        controlPanel.style.padding = '10px';
-        controlPanel.style.color = 'white';
-        controlPanel.style.fontFamily = 'monospace';
-        document.body.appendChild(controlPanel);
 
         // Initialisation de la scène
         const scene = new THREE.Scene();
@@ -74,37 +85,7 @@ const Scene = () => {
         const renderer = new Renderer(canvasRef.current);
         rendererRef.current = renderer;
         renderer.init(scene, camera);
-        renderer.setLuminance(0.1)
-        renderer.setDistortion(0.05)
-        renderer.setAberration(3)
-        renderer.setScanlines(0.3, 100, 2.0);
-        renderer.setGlow(1.5, 0.5, 0.85);
-
-        // Création des contrôles
-        const passes = ['luminance', 'distortion', 'aberration', 'scanlines', 'glow'];
-        passes.forEach(pass => {
-            const container = document.createElement('div');
-            container.style.marginBottom = '5px';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = pass;
-            checkbox.checked = true;
-            checkbox.onchange = () => {
-                if (rendererRef.current) {
-                    rendererRef.current.enabledPasses[pass] = checkbox.checked;
-                }
-            };
-            
-            const label = document.createElement('label');
-            label.htmlFor = pass;
-            label.textContent = ` ${pass.charAt(0).toUpperCase() + pass.slice(1)}`;
-            label.style.marginLeft = '5px';
-            
-            container.appendChild(checkbox);
-            container.appendChild(label);
-            controlPanel.appendChild(container);
-        });
+        setIsRendererReady(true);  // Marquons le renderer comme prêt
 
         // Animation loop
         let frameId;
@@ -152,9 +133,6 @@ const Scene = () => {
                 document.body.removeChild(statsRef.current.dom);
             }
             
-            // Retirer le panneau de contrôle
-            document.body.removeChild(controlPanel);
-            
             // Cleanup Three.js resources
             if (geometryRef.current) {
                 geometryRef.current.dispose();
@@ -173,7 +151,18 @@ const Scene = () => {
         };
     }, []);
 
-    return <canvas ref={canvasRef} className="w-full h-full" />;
+    return (
+        <div className="relative w-full h-full">
+            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+            {isRendererReady && (
+                <EffectControls
+                    renderer={rendererRef.current}
+                    enabledPasses={enabledPasses}
+                    onTogglePass={handleTogglePass}
+                />
+            )}
+        </div>
+    );
 };
 
 export default Scene;
