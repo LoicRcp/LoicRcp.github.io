@@ -5,7 +5,10 @@ import { Renderer } from '../../pipeline/renderer';
 import EffectControls from '../Controls/EffectControls';
 import { TerminalPlane } from '../Terminal/TerminalPlane';
 import { sections } from '../Terminal/sections';
-import { CreativeAnimation } from "../3d/creativeAnimation"
+import { CreativeAnimation } from "../3d/creativeAnimation";
+import { AudioService } from '../../services/AudioService';
+import AudioControls from '../Controls/AudioControls';
+import AudioDebug from '../Debug/AudioDebug';
 
 const Scene = () => {
     const terminalRef = useRef(null);
@@ -57,6 +60,9 @@ const Scene = () => {
     const customPanelRef = useRef(null);
 
     const [isRendererReady, setIsRendererReady] = useState(false);
+    const [audioService] = useState(() => new AudioService());
+    const [isPlaying, setIsPlaying] = useState(false);
+    const creativeAnimationRef = useRef(null);
 
     // State pour les passes activées
     const [enabledPasses, setEnabledPasses] = useState({
@@ -77,72 +83,73 @@ const Scene = () => {
         });
     };
 
+    const handlePlay = async () => {
+        try {
+            await audioService.play();
+            // Après le play, on peut initialiser l'animation avec l'audio
+            const analyser = audioService.getAnalyser();
+            if (analyser && creativeAnimationRef.current) {
+                const newAnimation = new CreativeAnimation(analyser);
+                newAnimation.setResolution(window.innerWidth, window.innerHeight);
+                
+                // Remplacer l'ancienne animation
+                sceneRef.current.remove(creativeAnimationRef.current.mesh);
+                creativeAnimationRef.current.dispose();
+                
+                creativeAnimationRef.current = newAnimation;
+                sceneRef.current.add(newAnimation.mesh);
+            }
+            setIsPlaying(true);
+        } catch (error) {
+            console.error('Erreur lors de la lecture:', error);
+        }
+    };
+
+    const handlePause = () => {
+        audioService.pause();
+        setIsPlaying(false);
+    };
+
     useEffect(() => {
         // Initialisation des stats
         const stats = new Stats();
-        stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+        stats.showPanel(0);
         
-        // Création du panel personnalisé
         const customPanel = new Stats.Panel('Pipeline', '#ff8', '#221');
         stats.addPanel(customPanel);
         customPanelRef.current = customPanel;
         
-        // Configuration de l'affichage des stats
         stats.dom.style.position = 'absolute';
         stats.dom.style.right = '0px';
         stats.dom.style.top = '0px';
         document.body.appendChild(stats.dom);
         statsRef.current = stats;
 
-        // Initialisation de la scène
+        // Scène et caméra
         const scene = new THREE.Scene();
         sceneRef.current = scene;
         scene.background = new THREE.Color(0x000000);
 
-        // Configuration de la caméra
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.z = 5;
         cameraRef.current = camera;
 
-        // Création du terminal
+        // Terminal
         const terminal = new TerminalPlane(8, 6);
-        terminal.setPosition(-4, 0, 0); // Position dans la moitié gauche
+        terminal.setPosition(-2, 0, 0);
         terminalRef.current = terminal;
         scene.add(terminal.mesh);
-
-
-        const creativeAnimation = new CreativeAnimation();
-        scene.add(creativeAnimation.mesh);
-
-        /*
-        // Ajout du cube
-        const geometry = new THREE.BoxGeometry();
-        const material = new THREE.MeshBasicMaterial({ 
-            color: 0xffffff, 
-            wireframe: true 
-        });
-        
-        geometryRef.current = geometry;
-        materialRef.current = material;
-        
-        const cube = new THREE.Mesh(geometry, material);
-        cube.position.x = 4; // Position dans la moitié droite
-        scene.add(cube);
-        */
-        // Animation du cube
-
-        /*
-        const animateCube = () => {
-            cube.rotation.x += 0.01;
-            cube.rotation.y += 0.01;
-        };
-        */
 
         // Création du renderer
         const renderer = new Renderer(canvasRef.current);
         rendererRef.current = renderer;
         renderer.init(scene, camera);
-        setIsRendererReady(true);  // Marquons le renderer comme prêt
+        setIsRendererReady(true);
+
+        // Animation de base (sans audio)
+        const creativeAnimation = new CreativeAnimation();
+        creativeAnimationRef.current = creativeAnimation;
+        scene.add(creativeAnimation.mesh);
 
         // Animation loop
         let frameId;
@@ -151,11 +158,11 @@ const Scene = () => {
             
             stats.begin();
             
-            //animateCube();
-            creativeAnimation.update(performance.now() * 0.001);
+            if (creativeAnimationRef.current) {
+                creativeAnimationRef.current.update(performance.now() * 0.001);
+            }
             renderer.render();
             
-            // Mise à jour du panel personnalisé avec les mesures de performance
             const measures = performance.getEntriesByType('measure');
             let panelText = '';
             measures.forEach(measure => {
@@ -163,7 +170,6 @@ const Scene = () => {
             });
             customPanel.update(undefined, undefined, panelText);
             
-            // Nettoyage des mesures pour la prochaine frame
             performance.clearMarks();
             performance.clearMeasures();
             
@@ -178,7 +184,9 @@ const Scene = () => {
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
             renderer.setSize(width, height);
-            creativeAnimation.setResolution(width, height);
+            if (creativeAnimationRef.current) {
+                creativeAnimationRef.current.setResolution(width, height);
+            }
         };
         window.addEventListener('resize', handleResize);
 
@@ -187,12 +195,10 @@ const Scene = () => {
             window.removeEventListener('resize', handleResize);
             cancelAnimationFrame(frameId);
             
-            // Retirer les stats
             if (statsRef.current) {
                 document.body.removeChild(statsRef.current.dom);
             }
             
-            // Cleanup Three.js resources
             if (terminalRef.current) {
                 terminalRef.current.dispose();
             }
@@ -205,27 +211,47 @@ const Scene = () => {
             if (rendererRef.current) {
                 rendererRef.current.dispose();
             }
-            if (creativeAnimation) {
-                creativeAnimation.dispose();
+            if (creativeAnimationRef.current) {
+                creativeAnimationRef.current.dispose();
             }
+            audioService.dispose();
             
-            // Vider la scène
             while(scene.children.length > 0) { 
                 scene.remove(scene.children[0]); 
             }
         };
-    }, []);
+    }, []); // Empty dependency array
+
+    // Effect pour gérer le resize initial une fois l'animation créée
+    useEffect(() => {
+        if (creativeAnimationRef.current) {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            creativeAnimationRef.current.setResolution(width, height);
+        }
+    }, [creativeAnimationRef.current]); // Se déclenche quand l'animation est créée
 
     return (
         <div className="relative w-full h-full">
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
             {/* Le terminal est maintenant un objet Three.js */}
             {isRendererReady && (
-                <EffectControls
-                    renderer={rendererRef.current}
-                    enabledPasses={enabledPasses}
-                    onTogglePass={handleTogglePass}
-                />
+                <>
+                    <EffectControls
+                        renderer={rendererRef.current}
+                        enabledPasses={enabledPasses}
+                        onTogglePass={handleTogglePass}
+                    />
+                    <AudioControls 
+                        onPlay={handlePlay}
+                        onPause={handlePause}
+                        isPlaying={isPlaying}
+                    />
+                    <AudioDebug 
+                        analyser={audioService.getAnalyser()}
+                        isPlaying={isPlaying}
+                    />
+                </>
             )}
         </div>
     );

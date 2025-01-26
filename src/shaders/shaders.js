@@ -27,14 +27,17 @@ export const luminanceFragmentShader = `
         color = pow(color, vec3(1.1)); // Augmente légèrement le contraste
 
         // Légère teinte verdâtre pour l'ambiance phosphore
-        vec3 tint = vec3(0.85, 1.05, 0.9);
+        vec3 tint = vec3(0.7, 1.3, 0.8);
         color *= tint;
 
         // Application du vignettage
         color *= vignette;
 
         // Léger boost de luminosité au centre
-        color *= 1.0 + (vignette * 0.2);
+        color *= 1.0 + (vignette * 0.4);
+
+        // Boost du glow vert
+        color.g *= 1.2;  // Boost supplémentaire sur le canal vert
 
         gl_FragColor = vec4(color, texel.a);
     }
@@ -209,69 +212,138 @@ export const glowVerticalFragmentShader = `
     }
 `;
 
-export const fractalPyramidShader = `
+export const universeWithinShader = `
     uniform float time;
     uniform vec2 resolution;
+    uniform sampler2D iChannel0; // Audio texture (FFT data)
     varying vec2 vUv;
+    
+    #define S(a, b, t) smoothstep(a, b, t)
+    #define NUM_LAYERS 4.
 
-    vec3 palette(float d){
-        return mix(vec3(0.2,0.7,0.9), vec3(1.,0.,1.), d);
+    float N21(vec2 p) {
+        vec3 a = fract(vec3(p.xyx) * vec3(213.897, 653.453, 253.098));
+        a += dot(a, a.yzx + 79.76);
+        return fract((a.x + a.y) * a.z);
     }
 
-    vec2 rotate(vec2 p, float a){
-        float c = cos(a);
-        float s = sin(a);
-        return p*mat2(c,s,-s,c);
+    vec2 GetPos(vec2 id, vec2 offs, float t) {
+        float n = N21(id+offs);
+        float n1 = fract(n*10.);
+        float n2 = fract(n*100.);
+        float a = t+n;
+        return offs + vec2(sin(a*n1), cos(a*n2))*.4;
     }
 
-    float map(vec3 p){
-        for(int i = 0; i < 8; ++i){
-            float t = time*0.2;
-            p.xz = rotate(p.xz,t);
-            p.xy = rotate(p.xy,t*1.89);
-            p.xz = abs(p.xz);
-            p.xz-=.5;
-        }
-        return dot(sign(p),p)/5.;
+    float df_line(in vec2 a, in vec2 b, in vec2 p) {
+        vec2 pa = p - a, ba = b - a;
+        float h = clamp(dot(pa,ba)/dot(ba,ba), 0., 1.);    
+        return length(pa - ba*h);
     }
 
-    vec4 rm(vec3 ro, vec3 rd){
-        float t = 0.;
-        vec3 col = vec3(0.);
-        float d;
-        
-        for(float i =0.; i<64.; i++){
-            vec3 p = ro + rd*t;
-            d = map(p)*.5;
-            if(d<0.02 || d>100.){
-                break;
+    float line(vec2 a, vec2 b, vec2 uv) {
+        float r1 = .04;
+        float r2 = .01;
+        float d = df_line(a, b, uv);
+        float d2 = length(a-b);
+        float fade = S(1.5, .5, d2);
+        fade += S(.05, .02, abs(d2-.75));
+        return S(r1, r2, d)*fade;
+    }
+
+    float NetLayer(vec2 st, float n, float t, float fft) {
+        vec2 id = floor(st)+n;
+        st = fract(st)-.5;
+       
+        vec2 p[9];
+        int i=0;
+        for(float y=-1.; y<=1.; y++) {
+            for(float x=-1.; x<=1.; x++) {
+                p[i++] = GetPos(id, vec2(x,y), t + fft*0.5);
             }
-            col+=palette(length(p)*.1)/(400.*(d));
-            t+=d;
         }
-        return vec4(col,1./(d*100.));
+        
+        float m = 0.;
+        float sparkle = 0.;
+        
+        for(int i=0; i<9; i++) {
+            m += line(p[4], p[i], st);
+            float d = length(st-p[i]);
+            float s = (.005/(d*d));
+            s *= S(1., .7, d);
+            float pulse = sin((fract(p[i].x)+fract(p[i].y)+t)*5.)*.4+.6;
+            pulse = pow(pulse * (1.0 + fft*2.0), 20.);
+            s *= pulse;
+            sparkle += s;
+        }
+        
+        m += line(p[1], p[3], st);
+        m += line(p[1], p[5], st);
+        m += line(p[7], p[5], st);
+        m += line(p[7], p[3], st);
+        
+        float sPhase = (sin(t+n)+sin(t*.1))*.25+.5;
+        sPhase += pow(sin(t*.1)*.5+.5, 50.)*5. * (1.0 + fft*3.0);
+        m += sparkle*sPhase;
+        
+        return m;
     }
 
     void main() {
-        // Conversion des coordonnées UV en coordonnées similaires à Shadertoy
         vec2 fragCoord = vUv * resolution;
-        vec2 uv = (fragCoord-(resolution/2.))/resolution.x;
-
-        // Setup de la caméra
-        vec3 ro = vec3(0.,0.,-50.);
-        ro.xz = rotate(ro.xz,time);
-        vec3 cf = normalize(-ro);
-        vec3 cs = normalize(cross(cf,vec3(0.,1.,0.)));
-        vec3 cu = normalize(cross(cf,cs));
+        vec2 uv = (fragCoord - resolution*.5)/resolution.y;
         
-        vec3 uuv = ro+cf*3. + uv.x*cs + uv.y*cu;
+        float t = time*.1;
+        float s = sin(t);
+        float c = cos(t);
+        mat2 rot = mat2(c, -s, s, c);
+        vec2 st = uv*rot;
         
-        vec3 rd = normalize(uuv-ro);
+        // Get audio data (FFT at different frequencies)
+        float fftLow = texture2D(iChannel0, vec2(0.5, 0.0)).x;
+        float fftMid = texture2D(iChannel0, vec2(0.5, 0.0)).x;
+        float fftHigh = texture2D(iChannel0, vec2(0.9, 0.0)).x;
         
-        // Calcul de la couleur
-        vec4 col = rm(ro,rd);
+        float m = 0.;
+        for(float i=0.; i<1.; i+=1./NUM_LAYERS) {
+            float z = fract(t+i + fftLow*0.1);
+            float size = mix(15., 1., z) * (1.0 + fftMid*0.5);
+            float fade = S(0., .6, z)*S(1., .8, z);
+            m += fade * NetLayer(st*size, i, time, fftHigh);
+        }
         
-        // Output
-        gl_FragColor = col;
+        vec3 baseCol = vec3(s, cos(t*.4), -sin(t*.24))*.4+.6;
+        vec3 col = baseCol*m;
+        
+        // Glow effect driven by audio with enhanced sparkle
+        float glowIntensity = mix(1.0, 4.0, fftHigh);
+        float sparkleNoise = fract(sin(dot(st, vec2(12.9898, 78.233))) * 43758.5453) * 0.15;
+        float audioSparkle = (fftHigh * fftMid) * sparkleNoise * 2.0;
+        
+        col += baseCol * glowIntensity * (fftLow + fftMid * 0.8 + audioSparkle);
+        col += vec3(audioSparkle);  // Add pure sparkle overlay
+        col *= 1.2;  // Global intensity boost
+        col *= 1.-dot(uv,uv) * (1.0 + fftLow*0.5);
+        
+        // Add vertical separator line
+        float separatorX = -0.5;  // Position de la ligne (tout à gauche de l'animation)
+        float lineWidth = 0.004;   // Largeur de la ligne
+        float lineGlow = 0.02;     // Largeur du glow
+        
+        // Distance à la ligne
+        float dLine = abs(uv.x - separatorX);
+        
+        // Couleur de base de la ligne (vert)
+        vec3 lineColor = vec3(0.2, 1.0, 0.4);
+        
+        // Calcul du glow de la ligne
+        float lineStrength = smoothstep(lineWidth, 0.0, dLine);
+        float lineGlowStrength = smoothstep(lineGlow, lineWidth, dLine);
+        
+        // Application de la ligne avec glow
+        col = mix(col, lineColor, lineStrength * 0.8);
+        col += lineColor * lineGlowStrength * 0.4 * (1.0 + fftMid * 0.5);
+        
+        gl_FragColor = vec4(col,1.0);
     }
 `;
