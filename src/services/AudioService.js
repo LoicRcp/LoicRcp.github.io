@@ -14,7 +14,7 @@ export class AudioService {
                 // Configuration de l'analyseur
                 this.analyser = this.context.createAnalyser();
                 this.analyser.fftSize = 256;
-                this.analyser.smoothingTimeConstant = 0.85;
+                this.analyser.smoothingTimeConstant = 0.75;
 
                 // Chargement du fichier audio
                 const response = await fetch('/audio/techno.mp3');

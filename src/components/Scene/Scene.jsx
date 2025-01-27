@@ -66,11 +66,11 @@ const Scene = () => {
 
     // State pour les passes activées
     const [enabledPasses, setEnabledPasses] = useState({
-        luminance: true,
-        distortion: true,
-        aberration: true,
-        scanlines: true,
-        glow: true
+        luminance: false,
+        distortion: false,
+        aberration: false,
+        scanlines: false,
+        glow: false
     });
 
     const handleTogglePass = (pass, enabled) => {
@@ -130,15 +130,16 @@ const Scene = () => {
         sceneRef.current = scene;
         scene.background = new THREE.Color(0x000000);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 5;
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 30, 0);
+        camera.rotation.x = -Math.PI / 2;
         cameraRef.current = camera;
 
         // Terminal
         const terminal = new TerminalPlane(8, 6);
         terminal.setPosition(-2, 0, 0);
         terminalRef.current = terminal;
-        scene.add(terminal.mesh);
+        //scene.add(terminal.mesh);
 
         // Création du renderer
         const renderer = new Renderer(canvasRef.current);
