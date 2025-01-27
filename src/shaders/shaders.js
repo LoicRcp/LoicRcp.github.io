@@ -218,115 +218,215 @@ export const universeWithinShader = `
     uniform sampler2D iChannel0; // Audio texture (FFT data)
     varying vec2 vUv;
     
-    #define S(a, b, t) smoothstep(a, b, t)
-    #define NUM_LAYERS 4.
+    #define T time
+    #define FAR 1e3
+    #define INFINITY 1e32
+    #define FOV 70.0
+    #define FOG .06
+    #define PI 3.14159265
+    #define TAU (2.0*PI)
+    #define PHI (1.618033988749895)
 
-    float N21(vec2 p) {
-        vec3 a = fract(vec3(p.xyx) * vec3(213.897, 653.453, 253.098));
-        a += dot(a, a.yzx + 79.76);
-        return fract((a.x + a.y) * a.z);
+    float hash12(vec2 p) {
+        float h = dot(p,vec2(127.1,311.7));    
+        return fract(sin(h)*43758.5453123);
     }
 
-    vec2 GetPos(vec2 id, vec2 offs, float t) {
-        float n = N21(id+offs);
-        float n1 = fract(n*10.);
-        float n2 = fract(n*100.);
-        float a = t+n;
-        return offs + vec2(sin(a*n1), cos(a*n2))*.4;
+    float noise_3(in vec3 p) {
+        vec3 i = floor(p);
+        vec3 f = fract(p);    
+        vec3 u = 1.-(--f)*f*f*f*-f;
+        
+        vec2 ii = i.xy + i.z * vec2(5.0);
+        float a = hash12( ii + vec2(0.0,0.0) );
+        float b = hash12( ii + vec2(1.0,0.0) );    
+        float c = hash12( ii + vec2(0.0,1.0) );
+        float d = hash12( ii + vec2(1.0,1.0) ); 
+        float v1 = mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+        
+        ii += vec2(5.0);
+        a = hash12( ii + vec2(0.0,0.0) );
+        b = hash12( ii + vec2(1.0,0.0) );    
+        c = hash12( ii + vec2(0.0,1.0) );
+        d = hash12( ii + vec2(1.0,1.0) );
+        float v2 = mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+            
+        return max(mix(v1,v2,u.z),0.);
     }
 
-    float df_line(in vec2 a, in vec2 b, in vec2 p) {
-        vec2 pa = p - a, ba = b - a;
-        float h = clamp(dot(pa,ba)/dot(ba,ba), 0., 1.);    
-        return length(pa - ba*h);
+    float fbm(vec3 x) {
+        float r = 0.0;
+        float w = 1.0, s = 1.0;
+        for (int i=0; i<3; i++) { // Réduit à 3 octaves
+            w *= 0.25;
+            s *= 3.;
+            r += w * noise_3(s * x);
+        }
+        return r;
+    }
+     
+    float yC(float x) {
+        return cos(x * -.134) * 1. * sin(x * .13) * 15.+ fbm(vec3(x * .1, 0., 0.) * 55.4);
     }
 
-    float line(vec2 a, vec2 b, vec2 uv) {
-        float r1 = .04;
-        float r2 = .01;
-        float d = df_line(a, b, uv);
-        float d2 = length(a-b);
-        float fade = S(1.5, .5, d2);
-        fade += S(.05, .02, abs(d2-.75));
-        return S(r1, r2, d)*fade;
+    void pR(inout vec2 p, float a) {
+        p = cos(a)*p + sin(a)*vec2(p.y, -p.x);
     }
 
-    float NetLayer(vec2 st, float n, float t, float fft) {
-        vec2 id = floor(st)+n;
-        st = fract(st)-.5;
-       
-        vec2 p[9];
-        int i=0;
-        for(float y=-1.; y<=1.; y++) {
-            for(float x=-1.; x<=1.; x++) {
-                p[i++] = GetPos(id, vec2(x,y), t + fft*0.5);
+    struct geometry {
+        float dist;
+        vec3 hit;
+        int iterations;
+    };
+
+    float fCylinderInf(vec3 p, float r) {
+        return length(p.xz) - r;
+    }
+
+    geometry map(vec3 p) {
+        // Audio reactive modifications
+        float fftLow = texture2D(iChannel0, vec2(0.1, 0.0)).x * 0.5; // Réduit l'intensité
+        float fftMid = texture2D(iChannel0, vec2(0.5, 0.0)).x * 0.5;
+        float fftHigh = texture2D(iChannel0, vec2(0.9, 0.0)).x * 0.5;
+        
+        // Modify the tunnel based on audio
+        p.x -= yC(p.y * (.1 + fftLow * 0.05)) * 3.;
+        p.z += yC(p.y * (.01 + fftMid * 0.02)) * 4.;
+        
+        float n = pow(abs(fbm(p * .06 )) * 12., 1.3);
+        float s = fbm(p * 0.01 + vec3(0., T * 0.14, 0.)) * 128.;
+        
+        geometry obj;
+        obj.dist = max(0., -fCylinderInf(p, s + 18. -n));
+        
+        p.x -= sin(p.y * .02) * 34. + cos(p.z * 0.01) * 62.;
+        
+        // Make the tunnel pulse with the music
+        float pulse = 28. + n * 2. + fftLow * 20.0;
+        obj.dist = max(obj.dist, -fCylinderInf(p, s + pulse));
+        
+        return obj;
+    }
+
+    float t_min = 10.0;
+    float t_max = FAR;
+    const int MAX_ITERATIONS = 60; // Réduit à 60 itérations
+
+    geometry trace(vec3 o, vec3 d) {
+        float omega = 1.3;
+        float t = t_min;
+        float candidate_error = INFINITY;
+        float candidate_t = t_min;
+        float previousRadius = 0.;
+        float stepLength = 0.;
+        float pixelRadius = 1./ 1000.;
+        
+        geometry mp = map(o);
+        float functionSign = mp.dist < 0. ? -1. : +1.;
+        float minDist = FAR;
+        
+        for (int i = 0; i < MAX_ITERATIONS; ++i) {
+            mp = map(d * t + o);
+            mp.iterations = i;
+        
+            float signedRadius = functionSign * mp.dist;
+            float radius = abs(signedRadius);
+            bool sorFail = omega > 1. &&
+                (radius + previousRadius) < stepLength;
+            
+            if (sorFail) {
+                stepLength -= omega * stepLength;
+                omega = 1.;
+            } else {
+                stepLength = signedRadius * omega;
             }
+            previousRadius = radius;
+            float error = radius / t;
+            
+            if (!sorFail && error < candidate_error) {
+                candidate_t = t;
+                candidate_error = error;
+            }
+            
+            if (!sorFail && error < pixelRadius || t > t_max) break;
+            
+            t += stepLength * .5;
         }
         
-        float m = 0.;
-        float sparkle = 0.;
+        mp.dist = candidate_t;
+        if ((t > t_max || candidate_error > pixelRadius)) mp.dist = INFINITY;
         
-        for(int i=0; i<9; i++) {
-            m += line(p[4], p[i], st);
-            float d = length(st-p[i]);
-            float s = (.005/(d*d));
-            s *= S(1., .7, d);
-            float pulse = sin((fract(p[i].x)+fract(p[i].y)+t)*5.)*.4+.6;
-            pulse = pow(pulse * (1.0 + fft*2.0), 20.);
-            s *= pulse;
-            sparkle += s;
-        }
-        
-        m += line(p[1], p[3], st);
-        m += line(p[1], p[5], st);
-        m += line(p[7], p[5], st);
-        m += line(p[7], p[3], st);
-        
-        float sPhase = (sin(t+n)+sin(t*.1))*.25+.5;
-        sPhase += pow(sin(t*.1)*.5+.5, 50.)*5. * (1.0 + fft*3.0);
-        m += sparkle*sPhase;
-        
-        return m;
+        return mp;
     }
 
     void main() {
-        vec2 fragCoord = vUv * resolution;
-        vec2 uv = (fragCoord - resolution*.5)/resolution.y;
+        vec2 uv = (vUv - 0.5) * 0.5; // Downscale par un facteur de 2
         
-        float t = time*.1;
-        float s = sin(t);
-        float c = cos(t);
-        mat2 rot = mat2(c, -s, s, c);
-        vec2 st = uv*rot;
+        // Audio reactive modifiers
+        float fftLow = texture2D(iChannel0, vec2(0.1, 0.0)).x * 0.5; // Réduit l'intensité
+        float fftMid = texture2D(iChannel0, vec2(0.5, 0.0)).x * 0.5;
+        float fftHigh = texture2D(iChannel0, vec2(0.9, 0.0)).x * 0.5;
+
+        uv *= tan(radians(FOV) / 2.0) * 4.;
         
-        // Get audio data (FFT at different frequencies)
-        float fftLow = texture2D(iChannel0, vec2(0.5, 0.0)).x;
-        float fftMid = texture2D(iChannel0, vec2(0.5, 0.0)).x;
-        float fftHigh = texture2D(iChannel0, vec2(0.9, 0.0)).x;
+        vec3 vuv = normalize(vec3(cos(T), sin(T * .11), sin(T * .41))); // up
+        vec3 ro = vec3(0., 30. + time * 100., -.1);
+
+        ro.x += yC(ro.y * .1) * 3.;
+        ro.z -= yC(ro.y * .01) * 4.;
         
-        float m = 0.;
-        for(float i=0.; i<1.; i+=1./NUM_LAYERS) {
-            float z = fract(t+i + fftLow*0.1);
-            float size = mix(15., 1., z) * (1.0 + fftMid*0.5);
-            float fade = S(0., .6, z)*S(1., .8, z);
-            m += fade * NetLayer(st*size, i, time, fftHigh);
+        vec3 vrp = vec3(0., 50. + time * 100., 2.);
+        
+        vrp.x += yC(vrp.y * .1) * 3.;
+        vrp.z -= yC(vrp.y * .01) * 4.;
+        
+        vec3 vpn = normalize(vrp - ro);
+        vec3 u = normalize(cross(vuv, vpn));
+        vec3 v = cross(vpn, u);
+        vec3 vcv = (ro + vpn);
+        vec3 scrCoord = (vcv + uv.x * u * resolution.x/resolution.y + uv.y * v);
+        vec3 rd = normalize(scrCoord - ro);
+        vec3 oro = ro;
+        
+        vec3 sceneColor = vec3(0.);
+
+        geometry tr = trace(ro, rd);
+        tr.hit = ro + rd * tr.dist;
+        
+        // Color influenced by audio
+        vec3 col = vec3(1., 0.5, .4) * fbm(tr.hit.xzy * .01) * 10.; // Réduit l'intensité
+        col.b *= fbm(tr.hit * .01) * 5.;  
+        col *= 1.0 + fftMid * 1.0; // Intensify colors with mid frequencies
+        
+        sceneColor += min(.8, float(tr.iterations) / 90.) * col + col * .03;
+        sceneColor *= 1. + .9 * (abs(fbm(tr.hit * .002 + 3.) * 5.) * (fbm(vec3(0.,0.,time * .05) * 2.)) * 1.);
+        
+        // Audio reactive intensity
+        float audioIntensity = 0.6 + fftLow * 0.8;
+        sceneColor = pow(sceneColor, vec3(1.)) * audioIntensity;
+        
+        vec3 steamColor1 = vec3(.0, .4, .5);
+        vec3 rro = oro;
+        ro = tr.hit;
+
+        float distC = tr.dist, f = 0., st = .9;
+        
+        for (float i = 0.; i < 12.; i++) { // Réduit le nombre d'itérations       
+            rro = ro - rd * distC;
+            f += fbm(rro * vec3(.1, .1, .1) * .3) * .1;
+            distC -= 3.;
+            if (distC < 3.) break;
         }
+     
+        steamColor1 *= 1.0 + fftHigh * 1.0; // Steam color affected by high frequencies
+        sceneColor += steamColor1 * pow(abs(f * 1.5), 3.) * 2.;
         
-        vec3 baseCol = vec3(s, cos(t*.4), -sin(t*.24))*.4+.6;
-        vec3 col = baseCol*m;
-        
-        // Glow effect driven by audio with enhanced sparkle
-        float glowIntensity = mix(1.0, 4.0, fftHigh);
-        float sparkleNoise = fract(sin(dot(st, vec2(12.9898, 78.233))) * 43758.5453) * 0.15;
-        float audioSparkle = (fftHigh * fftMid) * sparkleNoise * 2.0;
-        
-        col += baseCol * glowIntensity * (fftLow + fftMid * 0.8 + audioSparkle);
-        col += vec3(audioSparkle);  // Add pure sparkle overlay
-        col *= 1.2;  // Global intensity boost
-        col *= 1.-dot(uv,uv) * (1.0 + fftLow*0.5);
+        // Add vignette and final color adjustments
+        vec3 finalColor = clamp(sceneColor * (1. - length(uv) / 2.), 0.0, 1.0);
+        finalColor = pow(abs(finalColor / tr.dist * 130.), vec3(.8));
         
         // Add vertical separator line
-        float separatorX = -0.5;  // Position de la ligne (tout à gauche de l'animation)
+        float separatorX = -0.89;  // Position de la ligne (tout à gauche)
         float lineWidth = 0.004;   // Largeur de la ligne
         float lineGlow = 0.02;     // Largeur du glow
         
@@ -341,9 +441,9 @@ export const universeWithinShader = `
         float lineGlowStrength = smoothstep(lineGlow, lineWidth, dLine);
         
         // Application de la ligne avec glow
-        col = mix(col, lineColor, lineStrength * 0.8);
-        col += lineColor * lineGlowStrength * 0.4 * (1.0 + fftMid * 0.5);
+        finalColor = mix(finalColor, lineColor, lineStrength * 0.8);
+        finalColor += lineColor * lineGlowStrength * 0.4 * (1.0 + fftMid * 0.5);
         
-        gl_FragColor = vec4(col,1.0);
+        gl_FragColor = vec4(finalColor, 1.0);
     }
 `;
