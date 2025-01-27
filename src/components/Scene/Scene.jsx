@@ -131,15 +131,20 @@ const Scene = () => {
         scene.background = new THREE.Color(0x000000);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 30, 0);
+        camera.position.z = 5;
+        camera.position.y = 30
         camera.rotation.x = -Math.PI / 2;
+
         cameraRef.current = camera;
 
         // Terminal
         const terminal = new TerminalPlane(8, 6);
-        terminal.setPosition(-2, 0, 0);
+        terminal.setPosition(-1, 25, 5);
+        terminal.mesh.rotation.x = -Math.PI / 2;
+
         terminalRef.current = terminal;
-        //scene.add(terminal.mesh);
+        scene.add(terminal.mesh);
+        scene.add(terminal.mesh);
 
         // Création du renderer
         const renderer = new Renderer(canvasRef.current);
