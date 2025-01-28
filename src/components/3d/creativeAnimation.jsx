@@ -47,6 +47,23 @@ export class CreativeAnimation {
         this.vortexSystem.setResolution(width, height);
     }
 
+    // Méthodes de transformation déléguées au vortexSystem
+    setPosition(x, y, z) {
+        this.vortexSystem.setPosition(x, y, z);
+    }
+
+    getPosition() {
+        return this.vortexSystem.getPosition();
+    }
+
+    setScale(x, y, z) {
+        this.vortexSystem.setScale(x, y, z);
+    }
+
+    getScale() {
+        return this.vortexSystem.getScale();
+    }
+
     dispose() {
         this.vortexSystem.dispose();
     }

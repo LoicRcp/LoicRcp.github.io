@@ -119,6 +119,31 @@ export class VortexParticleSystem {
         
         this.mesh = new THREE.Points(this.particles, this.material);
     }
+
+    // Ajout des méthodes de contrôle de position
+    setPosition(x, y, z) {
+        this.mesh.position.set(x, y, z);
+    }
+
+    getPosition() {
+        return this.mesh.position;
+    }
+
+    setRotation(x, y, z) {
+        this.mesh.rotation.set(x, y, z);
+    }
+
+    getRotation() {
+        return this.mesh.rotation;
+    }
+
+    setScale(x, y, z) {
+        this.mesh.scale.set(x, y, z);
+    }
+
+    getScale() {
+        return this.mesh.scale;
+    }
     
     update(time, audioData) {
         const uniforms = this.material.uniforms;
@@ -129,8 +154,6 @@ export class VortexParticleSystem {
         uniforms.midImpact.value = Math.pow(audioData.mid, 1.2) * 1.2;
         uniforms.trebleImpact.value = Math.pow(audioData.treble, 2.0) * 2.0;
     }
-
-
 
     setResolution(width, height) {
         //resize

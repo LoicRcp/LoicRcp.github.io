@@ -9,6 +9,7 @@ import { CreativeAnimation } from "../3d/creativeAnimation";
 import { AudioService } from '../../services/AudioService';
 import AudioControls from '../Controls/AudioControls';
 import AudioDebug from '../Debug/AudioDebug';
+import PositionControls from '../Controls/PositionControls';
 
 const Scene = () => {
     const terminalRef = useRef(null);
@@ -256,6 +257,10 @@ const Scene = () => {
                     <AudioDebug 
                         analyser={audioService.getAnalyser()}
                         isPlaying={isPlaying}
+                    />
+                    <PositionControls 
+                        terminal={terminalRef.current}
+                        vortex={creativeAnimationRef.current}
                     />
                 </>
             )}
