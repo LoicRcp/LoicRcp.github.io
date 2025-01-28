@@ -8,6 +8,10 @@ export class CreativeAnimation {
         this.vortexSystem = new VortexParticleSystem(10000);
         this.mesh = this.vortexSystem.mesh;
         
+        // Position et échelle par défaut
+        this.setPosition(17, 0, 4);
+        this.setScale(0.4, 1, 0.4);
+        
         if (audioAnalyser) {
             this.fftData = new Uint8Array(audioAnalyser.frequencyBinCount);
         }

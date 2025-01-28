@@ -140,7 +140,7 @@ const Scene = () => {
 
         // Terminal
         const terminal = new TerminalPlane(8, 6);
-        terminal.setPosition(-1, 25, 5);
+        terminal.setPosition(-1.8, 25, 7);
         terminal.mesh.rotation.x = -Math.PI / 2;
 
         terminalRef.current = terminal;
