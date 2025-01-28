@@ -1,8 +1,42 @@
+const AVAILABLE_TRACKS = [
+    '/audio/techno.mp3',
+    '/audio/techno2.mp3',
+    '/audio/techno3.mp3',
+];
+
 export class AudioService {
     constructor() {
         this.isPlaying = false;
         this.isInitialized = false;
         this.audioBuffer = null;
+        this.currentTrack = null;
+    }
+
+    getRandomTrack() {
+        const currentIndex = this.currentTrack ? AVAILABLE_TRACKS.indexOf(this.currentTrack) : -1;
+        let newIndex;
+        // Si on n'a qu'une seule piste, on la rejoue
+        if (AVAILABLE_TRACKS.length === 1) {
+            newIndex = 0;
+        } else {
+            // Sélectionne un index différent du courant
+            do {
+                newIndex = Math.floor(Math.random() * AVAILABLE_TRACKS.length);
+            } while (newIndex === currentIndex);
+        }
+        return AVAILABLE_TRACKS[newIndex];
+    }
+
+    async loadTrack(trackPath) {
+        try {
+            const response = await fetch(trackPath);
+            const arrayBuffer = await response.arrayBuffer();
+            this.audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+            this.currentTrack = trackPath;
+        } catch (error) {
+            console.error('Erreur lors du chargement de la piste:', error);
+            throw error;
+        }
     }
 
     async init() {
@@ -16,10 +50,9 @@ export class AudioService {
                 this.analyser.fftSize = 256;
                 this.analyser.smoothingTimeConstant = 0.75;
 
-                // Chargement du fichier audio
-                const response = await fetch('/audio/techno.mp3');
-                const arrayBuffer = await response.arrayBuffer();
-                this.audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+                // Chargement de la première piste aléatoire
+                const firstTrack = this.getRandomTrack();
+                await this.loadTrack(firstTrack);
 
                 this.isInitialized = true;
                 return this.analyser;
@@ -47,7 +80,16 @@ export class AudioService {
         this.source.buffer = this.audioBuffer;
         this.source.connect(this.analyser);
         this.analyser.connect(this.context.destination);
-        this.source.loop = true;
+        this.source.loop = false;
+
+        // Gestion de la fin de la piste
+        this.source.onended = async () => {
+            // Charger et jouer la prochaine piste
+            const nextTrack = this.getRandomTrack();
+            await this.loadTrack(nextTrack);
+            const newSource = this.createSource();
+            newSource.start(0);
+        };
 
         return this.source;
     }
