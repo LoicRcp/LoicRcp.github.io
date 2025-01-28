@@ -87,63 +87,120 @@ float snoise(vec3 v) {
     return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
 }
 
-void main() {
-    // Cycle de vie et phase individuelle
-    float life = fract(time * 0.1 + random);
-    vLife = life;
+// Nouvelle fonction curl noise pour un mouvement plus organique
+vec3 curlNoise(vec3 p) {
+    const float e = 0.1;
+    vec3 dx = vec3(e, 0.0, 0.0);
+    vec3 dy = vec3(0.0, e, 0.0);
+    vec3 dz = vec3(0.0, 0.0, e);
+    
+    vec3 noise_x = vec3(
+        snoise(p + dx),
+        snoise(p + dx + vec3(43.2, 12.3, 54.2)),
+        snoise(p + dx + vec3(12.3, 89.1, 32.1))
+    );
+    
+    vec3 noise_y = vec3(
+        snoise(p + dy),
+        snoise(p + dy + vec3(23.2, 45.3, 12.2)),
+        snoise(p + dy + vec3(76.2, 34.1, 29.8))
+    );
+    
+    vec3 noise_z = vec3(
+        snoise(p + dz),
+        snoise(p + dz + vec3(12.4, 56.7, 89.0)),
+        snoise(p + dz + vec3(34.5, 67.8, 19.2))
+    );
+    
+    return vec3(
+        noise_z.y - noise_y.z,
+        noise_x.z - noise_z.x,
+        noise_y.x - noise_x.y
+    ) * (1.0/e);
+}
 
-    float baseRadius = length(position.xz);
-    float angle = atan(position.x, position.z);
+void main() {
+    // Nouveau cycle de vie non-linéaire
+    float lifePhase = mod(time * (0.5 + bassImpact * 2.0) + random * 10.0, 1.0);
+    vLife = lifePhase;
     
-    // Bruit multi-octave pour le mouvement organique
-    vec3 noisePos = vec3(position.xz * 0.5, time * 0.3) + noiseSeed;
-    float turbulence = snoise(noisePos) * 2.0;
-    turbulence += snoise(noisePos * 2.0) * 1.0;
-    turbulence *= midImpact * 0.8;
+    // Position initiale avec dérive aléatoire
+    vec3 pos = position + velocity * time * (0.5 + midImpact);
     
-    // Dynamique du vortex modulable
-    float spiralTightness = 1.0 - bassImpact * 0.3;
-    float angularSpeed = 0.25 + midImpact * 0.6;
-    angle += (angularSpeed * time) / (0.5 + baseRadius * 0.3) + turbulence;
+    // Champ de force complexe avec impact réduit
+    vec3 fieldPos = pos * 0.2 + noiseSeed + time * 0.1;
+    vec3 fieldForce = curlNoise(fieldPos) * (0.3 + trebleImpact * 0.8);
+    fieldForce += curlNoise(fieldPos * 3.0) * 0.2;
     
-    // Réaction verticale complexe
-    float verticalWave = sin(time * 3.0 + baseRadius * 0.5) * trebleImpact;
-    verticalWave += cos(time * 1.5 + angle) * bassImpact * 0.5;
+    // Réaction aux basses fréquences (ondes de choc)
+    float bassWave = smoothstep(0.3, 0.8, bassImpact) * 
+                    exp(-length(pos.xz) * 0.1) * 
+                    sin(time * 20.0) * 0.2;
     
-    // Forme évolutive du vortex
-    float radiusMod = 15.0 + 5.0 * sin(time * 0.2 + bassImpact * 3.0);
-    radiusMod *= 1.0 + 0.3 * sin(life * 20.0) * trebleImpact;
+    // Interactions entre particules (approximation)
+    float repulsion = (1.0 - smoothstep(0.0, 10.0, length(pos.xz))) * 
+                     snoise(vec3(pos.xy * 0.3, time)) * 
+                     bassImpact * 0.3;
     
-    // Position finale avec multiples influences
-    vec3 vortexPosition = vec3(
-        (baseRadius + turbulence * 0.5) * cos(angle) * spiralTightness,
-        position.y * 0.8 + verticalWave * 2.0,
-        (baseRadius + turbulence * 0.5) * sin(angle) * spiralTightness
+    // Physique hybride
+    vec3 acceleration = vec3(
+        fieldForce.x * (0.8 + midImpact * 0.5) + bassWave,
+        fieldForce.y * 0.4 - (pos.y * 0.02) + repulsion,
+        fieldForce.z * (0.8 + midImpact * 0.5) + bassWave
     );
     
-    // Effet de pulsation globale
-    vortexPosition *= 1.0 + bassImpact * 0.2 * sin(time * 4.0);
+    // Intégration de la vitesse avec comportement liquide
+    pos += acceleration * (0.01 + trebleImpact * 0.05) * 
+           (1.0 + 0.3 * sin(time * 3.0 + random * 10.0));
     
-    // Couleurs dynamiques
-    vec3 colorA = vec3(
-        0.5 + 0.5 * sin(angle + time),
-        0.3 + 0.3 * bassImpact,
-        0.6 + 0.4 * cos(angle * 0.5)
+    // Effet de tourbillon chaotique
+    float vortexIntensity = 1.0 + bassImpact * 3.0;
+    float angle = atan(pos.z, pos.x) + 
+                 (time * 0.5) / (0.5 + length(pos.xz) * 0.1) * vortexIntensity;
+    float radius = length(pos.xz) * (0.9 + snoise(vec3(time * 0.3, pos.y, 0.0)) * 0.3);
+    
+    pos.x = radius * cos(angle);
+    pos.z = radius * sin(angle);
+    
+    // Réaction extrême aux aigus
+    float trebleDistortion = pow(trebleImpact, 3.0) * 
+                            snoise(vec3(pos.xy * 10.0, time * 2.0)) * 
+                            (0.3 + 0.7 * lifePhase);
+    pos.xy += trebleDistortion * 0.5;
+    
+    // Couleurs psychédéliques réactives
+    vec3 color1 = vec3(
+        0.5 + 0.5 * sin(time * 0.5 + pos.x),
+        0.3 + 0.3 * cos(time * 0.7 + pos.y),
+        0.6 + 0.4 * sin(time * 0.9 + pos.z)
     );
-    vec3 colorB = vec3(
-        0.8 * trebleImpact,
-        0.4 * midImpact,
-        0.6 + 0.4 * bassImpact
+    
+    vec3 color2 = vec3(
+        trebleImpact,
+        midImpact * 0.8,
+        bassImpact * 1.2
     );
-    vColor = mix(colorA, colorB, 0.5 + 0.5 * sin(time * 0.5));
     
-    // Position finale et taille réactive
-    float sparkIntensity = smoothstep(0.4, 0.7, trebleImpact) * (0.3 + 0.3 * sin(time * 15.0 + life * 10.0));
-    vSpark = sparkIntensity;
+    vColor = mix(color1, color2, 0.5 + 0.5 * sin(time * 0.2)) * 
+             (1.0 + 2.0 * bassImpact * sin(time * 10.0));
     
-    vec4 mvPosition = modelViewMatrix * vec4(vortexPosition, 1.0);
-    gl_PointSize = size * (1.5 + bassImpact * 3.0 + trebleImpact * 2.0 + sparkIntensity * 4.0);
+    // Effets visuels extrêmes
+    vSpark = pow((sin(time * 30.0 + random * 10.0) * 0.5 + 0.5) * trebleImpact, 3.0);
+    
+    // Projection finale avec distorsion avec impact réduit
+    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+    gl_PointSize = size * (2.0 + 
+                  bassImpact * 3.0 + 
+                  trebleImpact * 2.0 + 
+                  vSpark * 4.0) * 
+                  (1.0 + 0.3 * sin(time * 5.0 + random * 10.0));
+    
+    // Tremblement aléatoire
     gl_Position = projectionMatrix * mvPosition;
+    gl_Position.xy += vec2(
+        snoise(vec3(time * 10.0, random, 0.0)),
+        snoise(vec3(time * 10.0, random, 1.0))
+    ) * bassImpact * 0.02;
 }
 `;
 
@@ -152,16 +209,31 @@ varying vec3 vColor;
 varying float vSpark;
 
 void main() {
-    vec2 uv = gl_PointCoord - 0.5;
+    vec2 uv = gl_PointCoord * 2.0 - 1.0;
     float dist = length(uv);
     
-    // Forme plus définie
-    float alpha = smoothstep(0.5, 0.3, dist) * 0.6;
-    alpha += vSpark * exp(-dist * 12.0) * 1.2;
+    // Forme dynamique avec distorsion
+    float distortion = sin(uv.x * 10.0 + vSpark * 5.0) * 
+                      cos(uv.y * 8.0) * 
+                      0.1 * vSpark;
+    dist += distortion;
     
-    // Contraste amélioré
-    vec3 color = mix(vColor, vec3(1.0), vSpark * 0.6);
-    gl_FragColor = vec4(color, alpha);
+    // Coeur de la particule
+    float alpha = smoothstep(0.6, 0.3, dist) * 0.8;
+    
+    // Halos énergétiques avec intensité réduite
+    float energyHalo = pow(1.0 - dist, 3.0) * vSpark * 1.2;
+    alpha += energyHalo * 0.7;
+    
+    // Effet de surbrillance modéré
+    vec3 coreColor = mix(vColor, vec3(1.0), energyHalo * 0.4);
+    
+    // Scanlines
+    float scanline = sin(gl_FragCoord.y * 0.5) * 0.1 + 1.0;
+    
+    // Final color with CRT effect
+    gl_FragColor = vec4(coreColor * scanline, alpha);
+    gl_FragColor.a *= 1.0 - smoothstep(0.4, 1.0, dist);
 }
 `;
 
@@ -169,6 +241,25 @@ export class VortexParticleSystem {
     constructor(count = 25000) {
         this.particleCount = count;
         this.particles = new THREE.BufferGeometry();
+        
+        // État interne pour les transitions
+        this.state = {
+            currentMood: 0, // Entre 0 et 1
+            targetMood: Math.random(),
+            moodChangeSpeed: 0.01,
+            lastEventTime: 0,
+            turbulenceLevels: new Array(3).fill(0).map(() => Math.random()),
+            rotationSpeeds: new Array(3).fill(0).map(() => (Math.random() - 0.5) * 0.1),
+            nextEventTime: Math.random() * 5000
+        };
+
+        // Paramètres de chaos
+        this.chaosParams = {
+            baseAmplitude: 0.5,
+            maxTurbulence: 2.0,
+            eventProbability: 0.005, // Probabilité par frame
+            eventIntensity: 1.2
+        };
         
         // Initialisation plus serrée
         const positions = new Float32Array(count * 3);
@@ -222,7 +313,10 @@ export class VortexParticleSystem {
                 bassImpact: { value: 0 },
                 midImpact: { value: 0 },
                 trebleImpact: { value: 0 },
-                noiseSeed: { value: new THREE.Vector3(2.43, 7.23, 1.5) }
+                noiseSeed: { value: new THREE.Vector3(2.43, 7.23, 1.5) },
+                touchTexture: { value: new THREE.DataTexture(
+                    new Float32Array(4), 1, 1, THREE.RGBAFormat, THREE.FloatType
+                )}
             }
         });
         
@@ -255,19 +349,38 @@ export class VortexParticleSystem {
     }
     
     update(time, audioData) {
-        // Variation progressive des paramètres
-        const pulse = Math.sin(time * 0.5) * 0.5 + 0.5;
+        // Réactions non-linéaires aux entrées audio
+        const bass = audioData.bass;
+        const mid = audioData.mid;
+        const treble = audioData.treble;
         
-        // Temps ralenti pour des mouvements plus fluides
-        this.material.uniforms.time.value = time * 0.8;
+        // Mise à jour du temps
+        this.material.uniforms.time.value = time;
         
-        // Modulation interactive
-        this.material.uniforms.bassImpact.value = audioData.bass * (0.8 + pulse * 0.2);
-        this.material.uniforms.midImpact.value = audioData.mid * (1.0 - pulse * 0.3);
-        this.material.uniforms.trebleImpact.value = audioData.treble * 1.2;
+        // Effet de compression dynamique plus modéré
+        this.material.uniforms.bassImpact.value = Math.pow(bass * 1.2, 2.0);
+        this.material.uniforms.midImpact.value = mid * (0.6 + Math.sin(time) * 0.2);
+        this.material.uniforms.trebleImpact.value = treble * (1.0 + bass * 0.5);
         
-        // Rotation progressive du système
-        this.mesh.rotation.y = time * 0.05;
+        // Modification aléatoire du noiseSeed
+        if(Math.random() < 0.1) {
+            this.material.uniforms.noiseSeed.value.set(
+                Math.random() * 10,
+                Math.random() * 10,
+                Math.random() * 10
+            );
+        }
+        
+        // Rotation erratique
+        this.mesh.rotation.y += Math.sin(time * bass) * 0.02;
+        this.mesh.rotation.x = Math.cos(time * 0.3) * 0.1 * mid;
+        
+        // Mise à jour de la texture tactile (exemple)
+        const touchData = new Float32Array([
+            Math.random(), Math.random(), Math.random(), 1.0
+        ]);
+        this.material.uniforms.touchTexture.value.image.data.set(touchData);
+        this.material.uniforms.touchTexture.value.needsUpdate = true;
     }
 
     setResolution(width, height) {
