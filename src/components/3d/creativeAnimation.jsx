@@ -15,22 +15,44 @@ export class CreativeAnimation {
         if (audioAnalyser) {
             this.fftData = new Uint8Array(audioAnalyser.frequencyBinCount);
         }
+
+        this.audioHistory = {
+            bass: new Array(5).fill(0),
+            mid: new Array(3).fill(0),
+            treble: new Array(2).fill(0)
+        };
     }
 
     update(time) {
-        let audioData = { bass: 0, mid: 0, treble: 0 };
-        
         if (this.audioAnalyser) {
             this.audioAnalyser.getByteFrequencyData(this.fftData);
             
-            audioData = {
-                bass: this.sumRange(20, 250),      // 20Hz - 250Hz
-                mid: this.sumRange(250, 4000),     // 250Hz - 4000Hz
-                treble: this.sumRange(4000, 20000) // 4000Hz - 20000Hz
-            };
+            // Calcul des valeurs avec lissage
+            this.audioHistory.bass.push(this.sumRange(20, 250));
+            this.audioHistory.bass.shift();
+            const smoothBass = this.audioHistory.bass.reduce((a,b) => a + b) / 5;
+            
+            this.audioHistory.mid.push(this.sumRange(250, 4000));
+            this.audioHistory.mid.shift();
+            const smoothMid = this.audioHistory.mid.reduce((a,b) => a + b) / 3;
+            
+            this.audioHistory.treble.push(this.sumRange(4000, 20000));
+            this.audioHistory.treble.shift();
+            const smoothTreble = this.audioHistory.treble.reduce((a,b) => a + b) / 2;
+            
+            // Réactivité non-linéaire
+            const bassImpact = Math.pow(smoothBass, 1.5) * 0.7;
+            const midImpact = Math.pow(smoothMid, 0.8) * 1.2;
+            const trebleImpact = Math.pow(smoothTreble, 2.0) * 1.5;
+            
+            this.vortexSystem.update(time, {
+                bass: bassImpact,
+                mid: midImpact,
+                treble: trebleImpact
+            });
+        } else {
+            this.vortexSystem.update(time, { bass: 0, mid: 0, treble: 0 });
         }
-    
-        this.vortexSystem.update(time, audioData);
     }
 
     sumRange(startFreq, endFreq) {
