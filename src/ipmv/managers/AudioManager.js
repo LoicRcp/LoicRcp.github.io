@@ -8,6 +8,8 @@ export class AudioManager {
     this.audioContext = null;
     this.analyser = null;
     this.dataArray = null;
+    this.playlist = [];
+    this.currentTrackIndex = 0;
     
     // Plages de fréquences
     this.lowFrequency = 10;
@@ -15,32 +17,68 @@ export class AudioManager {
     this.highFrequency = 9000;
     this.bufferLength = 0;
 
-    this.song = {
-      url: 'https://p.scdn.co/mp3-preview/3be3fb77f5b2945c95e86d4c40ceceac20e5108f?cid=b62f0af3b0d54eca9bb49b99a2fc5820',
-    }
+    this.initializeRandomPlaylist();
+  }
+
+  initializeRandomPlaylist() {
+    const songs = ['audio/techno.mp3', 'audio/techno2.mp3', 'audio/techno3.mp3'];
+    this.playlist = songs.sort(() => Math.random() - 0.5);
   }
 
   async loadAudioBuffer() {
-    return new Promise((resolve) => {
-      const audioListener = new THREE.AudioListener();
-      this.audio = new THREE.Audio(audioListener);
-      const audioLoader = new THREE.AudioLoader();
+    return new Promise((resolve, reject) => {
+        // Nettoyage complet
+        if (this.audio) {
+            this.audio.stop();
+            this.audio.disconnect();
+            this.audio = null;
+        }
 
-      audioLoader.load(this.song.url, (buffer) => {
-        this.audio.setBuffer(buffer);
-        this.audio.setLoop(true);
-        this.audio.setVolume(0.5);
-        this.audioContext = this.audio.context;
+        // Nouvelle instance audio
+        const audioListener = new THREE.AudioListener();
+        this.audio = new THREE.Audio(audioListener);
         
-        // Initialiser l'analyser
+        // Chargement
+        new THREE.AudioLoader().load(
+            this.playlist[this.currentTrackIndex],
+            (buffer) => {
+                this.audio.setBuffer(buffer);
+                this.audio.setLoop(false);
+                this.audio.onEnded = () => this.nextTrack();
+                this.audioContext = this.audio.context;
+
+                resolve();
+            },
+            null,
+            reject
+        );
         this.analyser = new THREE.AudioAnalyser(this.audio, 1024);
         this.bufferLength = this.analyser.data.length;
         this.dataArray = new Uint8Array(this.analyser.analyser.frequencyBinCount);
-        
-        resolve();
-      });
     });
-  }
+}
+
+  async nextTrack() {
+    const wasPlaying = this.isPlaying;
+    
+    // Arrêter proprement la lecture actuelle
+    if (this.audio) {
+        this.audio.stop();
+        this.audio.disconnect();
+        this.isPlaying = false;
+    }
+
+    // Changer de piste
+    this.currentTrackIndex = (this.currentTrackIndex + 1) % this.playlist.length;
+    
+    // Recharger le buffer
+    await this.loadAudioBuffer();
+    
+    // Redémarrer la lecture si nécessaire
+    if (wasPlaying) {
+        await this.play();
+    }
+}
 
   play() {
     this.audio.play();

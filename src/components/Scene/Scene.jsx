@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import Stats from 'three/examples/jsm/libs/stats.module';
 import { Renderer } from '../../pipeline/renderer';
 import EffectControls from '../Controls/EffectControls';
 import { TerminalPlane } from '../Terminal/TerminalPlane';
@@ -58,8 +57,6 @@ const Scene = () => {
     const cameraRef = useRef(null);
     const geometryRef = useRef(null);
     const materialRef = useRef(null);
-    const statsRef = useRef(null);
-    const customPanelRef = useRef(null);
 
     const [isRendererReady, setIsRendererReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -109,6 +106,29 @@ const Scene = () => {
         setIsPlaying(false);
     };
 
+    const handleNext = async () => {
+        try {
+            const wasPlaying = audioManager.isPlaying;
+            if (wasPlaying) {
+                await audioManager.pause();
+            }
+            
+            await audioManager.nextTrack();
+            
+            // Re-détecter le BPM
+            if (audioManager.audio?.buffer) {
+                await bpmManager.detectBPM(audioManager.audio.buffer);
+            }
+            
+            if (wasPlaying) {
+                await audioManager.play();
+                reactiveParticlesRef.current?.resetMesh();
+            }
+        } catch (error) {
+            console.error('Erreur changement piste:', error);
+        }
+    };
+
     useEffect(() => {
         const initAudio = async () => {
             await audioManager.loadAudioBuffer();
@@ -120,23 +140,17 @@ const Scene = () => {
             });
         };
         initAudio();
-    }, [audioManager, bpmManager]);
+
+        return () => {
+            // Cleanup audio
+            if (audioManager.audio) {
+                audioManager.audio.stop();
+                audioManager.audio.disconnect();
+            }
+        };
+    }, [audioManager, bpmManager, audioManager.currentTrackIndex]);
 
     useEffect(() => {
-        // Initialisation des stats
-        const stats = new Stats();
-        stats.showPanel(0);
-
-        const customPanel = new Stats.Panel('Pipeline', '#ff8', '#221');
-        stats.addPanel(customPanel);
-        customPanelRef.current = customPanel;
-
-        stats.dom.style.position = 'absolute';
-        stats.dom.style.right = '0px';
-        stats.dom.style.top = '0px';
-        document.body.appendChild(stats.dom);
-        statsRef.current = stats;
-
         // Scène et caméra
         const scene = new THREE.Scene();
         sceneRef.current = scene;
@@ -180,7 +194,6 @@ const Scene = () => {
         const animate = () => {
             frameId = requestAnimationFrame(animate);
 
-            stats.begin();
             if (audioManager?.isPlaying) {
                 audioManager.update();
             }
@@ -191,17 +204,6 @@ const Scene = () => {
 
             renderer.render();
 
-            const measures = performance.getEntriesByType('measure');
-            let panelText = '';
-            measures.forEach(measure => {
-                panelText += `${measure.name}: ${measure.duration.toFixed(2)}ms\n`;
-            });
-            customPanel.update(undefined, undefined, panelText);
-
-            performance.clearMarks();
-            performance.clearMeasures();
-
-            stats.end();
         };
         animate();
 
@@ -211,10 +213,6 @@ const Scene = () => {
         // Cleanup
         return () => {
             cancelAnimationFrame(frameId);
-
-            if (statsRef.current) {
-                document.body.removeChild(statsRef.current.dom);
-            }
 
             if (terminalRef.current) {
                 terminalRef.current.dispose();
@@ -264,23 +262,17 @@ const Scene = () => {
             {/* Le terminal est maintenant un objet Three.js */}
             {isRendererReady && (
                 <>
-                    <EffectControls
-                        renderer={rendererRef.current}
-                        enabledPasses={enabledPasses}
-                        onTogglePass={handleTogglePass}
-                    />
                     <AudioControls
                         onPlay={handlePlay}
                         onPause={handlePause}
+                        onNext={handleNext}
                         isPlaying={isPlaying}
+                        isAudioReady={!!audioManager.audio?.buffer}
+                        playlistLength={audioManager.playlist.length}
                     />
                     <AudioDebug
                         analyser={audioManager.getAnalyser()}
                         isPlaying={isPlaying}
-                    />
-                     <PositionControls 
-                        terminal={terminalRef.current} 
-                        particles={reactiveParticlesRef.current} 
                     />
 
                 </>
