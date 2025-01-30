@@ -18,6 +18,7 @@ export class Renderer {
         this.renderer = new THREE.WebGLRenderer({
             canvas: canvas,
             antialias: true,
+            alpha: true,
             powerPreference: "high-performance"
         });
 

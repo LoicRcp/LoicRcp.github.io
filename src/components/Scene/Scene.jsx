@@ -5,8 +5,9 @@ import { Renderer } from '../../pipeline/renderer';
 import EffectControls from '../Controls/EffectControls';
 import { TerminalPlane } from '../Terminal/TerminalPlane';
 import { sections } from '../Terminal/sections';
-import { CreativeAnimation } from "../3d/creativeAnimation";
-import { AudioService } from '../../services/AudioService';
+import { ReactiveParticles } from '../../ipmv/ReactiveParticles';
+import { BPMManager } from '../../ipmv/managers/BPMManager';
+import { AudioManager } from '../../ipmv/managers/AudioManager';
 import AudioControls from '../Controls/AudioControls';
 import AudioDebug from '../Debug/AudioDebug';
 import PositionControls from '../Controls/PositionControls';
@@ -20,7 +21,7 @@ const Scene = () => {
     useEffect(() => {
         let index = 0;
         const section = sections[currentSection];
-        
+
         const timer = setInterval(() => {
             if (index < section.length) {
                 const newText = section.substring(0, index + 1);
@@ -61,9 +62,11 @@ const Scene = () => {
     const customPanelRef = useRef(null);
 
     const [isRendererReady, setIsRendererReady] = useState(false);
-    const [audioService] = useState(() => new AudioService());
     const [isPlaying, setIsPlaying] = useState(false);
-    const creativeAnimationRef = useRef(null);
+    const reactiveParticlesRef = useRef(null);
+    const [audioManager] = useState(() => new AudioManager());
+    const [bpmManager] = useState(() => new BPMManager());
+
 
     // State pour les passes activées
     const [enabledPasses, setEnabledPasses] = useState({
@@ -86,40 +89,48 @@ const Scene = () => {
 
     const handlePlay = async () => {
         try {
-            await audioService.play();
-            // Après le play, on peut initialiser l'animation avec l'audio
-            const analyser = audioService.getAnalyser();
-            if (analyser && creativeAnimationRef.current) {
-                const newAnimation = new CreativeAnimation(analyser);
-                newAnimation.setResolution(window.innerWidth, window.innerHeight);
-                
-                // Remplacer l'ancienne animation
-                sceneRef.current.remove(creativeAnimationRef.current.mesh);
-                creativeAnimationRef.current.dispose();
-                
-                creativeAnimationRef.current = newAnimation;
-                sceneRef.current.add(newAnimation.mesh);
+            if (audioManager.audioContext?.state === 'suspended') {
+                await audioManager.audioContext.resume();
+              }
+
+            await audioManager.play();
+            if (reactiveParticlesRef.current) {
+                reactiveParticlesRef.current.connectAudio(audioManager);
+                reactiveParticlesRef.current.resetMesh(); // Forcer un reset initial
             }
             setIsPlaying(true);
         } catch (error) {
-            console.error('Erreur lors de la lecture:', error);
+            console.error('Erreur lecture:', error);
         }
     };
 
     const handlePause = () => {
-        audioService.pause();
+        audioManager.pause();
         setIsPlaying(false);
     };
+
+    useEffect(() => {
+        const initAudio = async () => {
+            await audioManager.loadAudioBuffer();
+            if (audioManager.audio?.buffer) {
+                await bpmManager.detectBPM(audioManager.audio.buffer);
+            }
+            bpmManager.addEventListener('beat', () => {
+                reactiveParticlesRef.current?.onBPMBeat?.();
+            });
+        };
+        initAudio();
+    }, [audioManager, bpmManager]);
 
     useEffect(() => {
         // Initialisation des stats
         const stats = new Stats();
         stats.showPanel(0);
-        
+
         const customPanel = new Stats.Panel('Pipeline', '#ff8', '#221');
         stats.addPanel(customPanel);
         customPanelRef.current = customPanel;
-        
+
         stats.dom.style.position = 'absolute';
         stats.dom.style.right = '0px';
         stats.dom.style.top = '0px';
@@ -154,58 +165,56 @@ const Scene = () => {
         setIsRendererReady(true);
 
         // Animation de base (sans audio)
-        const creativeAnimation = new CreativeAnimation();
-        creativeAnimationRef.current = creativeAnimation;
-        scene.add(creativeAnimation.mesh);
+        const particles = new ReactiveParticles({
+            audioManager,
+            bpmManager
+        });
+        particles.init();
+        scene.add(particles);
+        reactiveParticlesRef.current = particles;
+
 
         // Animation loop
         let frameId;
         const animate = () => {
             frameId = requestAnimationFrame(animate);
-            
+
             stats.begin();
-            
-            if (creativeAnimationRef.current) {
-                creativeAnimationRef.current.update(performance.now() * 0.001);
+            if (audioManager?.isPlaying) {
+                audioManager.update();
             }
+            if (reactiveParticlesRef.current?.update) {
+                reactiveParticlesRef.current.update();
+            }
+
+
             renderer.render();
-            
+
             const measures = performance.getEntriesByType('measure');
             let panelText = '';
             measures.forEach(measure => {
                 panelText += `${measure.name}: ${measure.duration.toFixed(2)}ms\n`;
             });
             customPanel.update(undefined, undefined, panelText);
-            
+
             performance.clearMarks();
             performance.clearMeasures();
-            
+
             stats.end();
         };
         animate();
 
         // Event listener pour le redimensionnement
-        const handleResize = () => {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-            renderer.setSize(width, height);
-            if (creativeAnimationRef.current) {
-                creativeAnimationRef.current.setResolution(width, height);
-            }
-        };
-        window.addEventListener('resize', handleResize);
+
 
         // Cleanup
         return () => {
-            window.removeEventListener('resize', handleResize);
             cancelAnimationFrame(frameId);
-            
+
             if (statsRef.current) {
                 document.body.removeChild(statsRef.current.dom);
             }
-            
+
             if (terminalRef.current) {
                 terminalRef.current.dispose();
             }
@@ -218,25 +227,35 @@ const Scene = () => {
             if (rendererRef.current) {
                 rendererRef.current.dispose();
             }
-            if (creativeAnimationRef.current) {
-                creativeAnimationRef.current.dispose();
+            if (reactiveParticlesRef.current) {
+                reactiveParticlesRef.current.destroyMesh();
+                reactiveParticlesRef.current.material?.dispose();
+                reactiveParticlesRef.current.geometry?.dispose(); // Null-check ajouté
+                scene.remove(reactiveParticlesRef.current);
             }
-            audioService.dispose();
-            
-            while(scene.children.length > 0) { 
-                scene.remove(scene.children[0]); 
+
+            while (scene.children.length > 0) {
+                scene.remove(scene.children[0]);
             }
         };
-    }, []); // Empty dependency array
-
-    // Effect pour gérer le resize initial une fois l'animation créée
+    }, [audioManager, bpmManager]); // Empty dependency array
     useEffect(() => {
-        if (creativeAnimationRef.current) {
+        const handleResize = () => {
+            if (!cameraRef.current || !rendererRef.current) return;
             const width = window.innerWidth;
             const height = window.innerHeight;
-            creativeAnimationRef.current.setResolution(width, height);
-        }
-    }, [creativeAnimationRef.current]); // Se déclenche quand l'animation est créée
+
+            cameraRef.current.aspect = width / height;
+            cameraRef.current.updateProjectionMatrix();
+            rendererRef.current.setSize(width, height);
+
+            if (reactiveParticlesRef.current) {
+                reactiveParticlesRef.current.setResolution?.(width, height);
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     return (
         <div className="relative w-full h-full">
@@ -249,19 +268,16 @@ const Scene = () => {
                         enabledPasses={enabledPasses}
                         onTogglePass={handleTogglePass}
                     />
-                    <AudioControls 
+                    <AudioControls
                         onPlay={handlePlay}
                         onPause={handlePause}
                         isPlaying={isPlaying}
                     />
-                    <AudioDebug 
-                        analyser={audioService.getAnalyser()}
+                    <AudioDebug
+                        analyser={audioManager.getAnalyser()}
                         isPlaying={isPlaying}
                     />
-                    <PositionControls 
-                        terminal={terminalRef.current}
-                        vortex={creativeAnimationRef.current}
-                    />
+
                 </>
             )}
         </div>
