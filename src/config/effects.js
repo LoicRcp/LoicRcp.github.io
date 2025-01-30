@@ -1,7 +1,7 @@
 // Configuration par défaut des effets CRT
 export const DEFAULT_EFFECTS_CONFIG = {
     luminance: {
-        base: 0.13, // Réduit pour plus de contraste
+        base: 0.08, // Réduit pour plus de contraste
         min: 0.0,
         max: 1.0
     },

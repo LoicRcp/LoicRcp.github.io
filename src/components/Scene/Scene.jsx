@@ -167,7 +167,8 @@ const Scene = () => {
         // Animation de base (sans audio)
         const particles = new ReactiveParticles({
             audioManager,
-            bpmManager
+            bpmManager,
+            camera: cameraRef.current
         });
         particles.init();
         scene.add(particles);
@@ -263,7 +264,11 @@ const Scene = () => {
             {/* Le terminal est maintenant un objet Three.js */}
             {isRendererReady && (
                 <>
-                    
+                    <EffectControls
+                        renderer={rendererRef.current}
+                        enabledPasses={enabledPasses}
+                        onTogglePass={handleTogglePass}
+                    />
                     <AudioControls
                         onPlay={handlePlay}
                         onPause={handlePause}

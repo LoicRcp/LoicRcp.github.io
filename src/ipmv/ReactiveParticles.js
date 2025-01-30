@@ -11,7 +11,9 @@ uniform float offsetGain;
 uniform float amplitude;
 uniform float frequency;
 uniform float maxDistance;
-
+uniform float lowFreq;
+uniform float midFreq;
+uniform float highFreq;
 
 vec3 mod289(vec3 x){
   return x-floor(x*(1./289.))*289.;
@@ -126,6 +128,10 @@ void main() {
   float d = length(newpos - target) / maxDistance;
   newpos = mix(position, target, pow(d, 4.));
   newpos.z += sin(time) * (.1 * offsetGain);
+
+  newpos.x += sin(time * 10.0) * lowFreq * 0.01;
+  newpos.y += cos(time * 8.0) * midFreq * 0.01;
+
   
   vec4 mvPosition = modelViewMatrix * vec4(newpos, 1.);
   gl_PointSize = size + (pow(d,3.) * offsetSize) * (1./-mvPosition.z);
@@ -156,11 +162,12 @@ void main(){
 }`;
 
 export class ReactiveParticles extends THREE.Object3D {
-  constructor({ audioManager, bpmManager, gui = null } = {}) {
+  constructor({ audioManager, bpmManager, camera, gui = null } = {}) {
     super()
     
     if (!audioManager || !bpmManager) throw new Error('Missing required managers')
     
+    this.camera = camera;
     this.name = 'ReactiveParticles'
     this.audioManager = audioManager
     this.bpmManager = bpmManager
@@ -172,8 +179,10 @@ export class ReactiveParticles extends THREE.Object3D {
       autoMix: true,
       autoRotate: true,
     }
-    this.basePosition = new THREE.Vector3(2.5, 23.5, 5); // Position fixe désirée
+    this.basePosition = new THREE.Vector3(3.5, 23.5, 5); // Position fixe désirée
     this.position.copy(this.basePosition);
+    this.scale.set(2,2,2);
+    
     this.initialized = false
     this.pointsMesh = null
     this.holderObjects = new THREE.Object3D()
@@ -197,6 +206,9 @@ export class ReactiveParticles extends THREE.Object3D {
         amplitude: { value: 1 },
         offsetGain: { value: 0 },
         maxDistance: { value: 1.8 },
+        lowFreq: { value: 0 },
+        midFreq: { value: 0 },
+        highFreq: { value: 0 },
         startColor: { value: new THREE.Color(this.properties.startColor) },
         endColor: { value: new THREE.Color(this.properties.endColor) },
       },
@@ -315,17 +327,33 @@ export class ReactiveParticles extends THREE.Object3D {
       })
     }
 
-    if (Math.random() < 0.2){
-      this.resetMesh();
-      gsap.to(this.material.uniforms.startColor.value, {
-        duration: 0.1,
-        r: Math.random(),
-        g: Math.random(),
-        b: Math.random(),
-        yoyo: true,
-        repeat: 1
-      });
-    } 
+     if (Math.random() < 0.2){
+       this.resetMesh();
+       this.changeCooldown = null;
+    //   gsap.to(this.material.uniforms.startColor.value, {
+    //     duration: 0.1,
+    //     r: Math.random(),
+    //     g: Math.random(),
+    //     b: Math.random(),
+    //     yoyo: true,
+    //     repeat: 1
+       //});
+     } 
+
+     gsap.to(this.material.uniforms.size, {
+      value: 5.5,
+      duration: 0.07,
+      yoyo: true,
+      repeat: 1,
+      ease: 'power2.out'
+    });
+
+    gsap.to(this.camera.position, {
+      y: 30 + Math.random() * 0.3,
+      duration: 0.3,
+      yoyo: true,
+      ease: 'elastic.out(1, 0.3)'
+    });
   
   // Ajouter un cooldown entre les changements
   if (!this.changeCooldown) {
@@ -366,8 +394,18 @@ export class ReactiveParticles extends THREE.Object3D {
       const frequencyData = this.audioManager?.frequencyData
     
       if (isPlaying && frequencyData) {
+        this.material.uniforms.lowFreq.value = frequencyData.low;
+        this.material.uniforms.midFreq.value = frequencyData.mid;
+        this.material.uniforms.highFreq.value = frequencyData.high;
+
         this.material.uniforms.amplitude.value = 0.8 + 
           THREE.MathUtils.mapLinear(frequencyData.high, 0, 0.6, -0.1, 0.2)
+
+          const colorMix = THREE.MathUtils.mapLinear(frequencyData.mid, 0, 1, 0.2, 0.8);
+          this.material.uniforms.startColor.value.lerp(
+            new THREE.Color().setHSL(Math.sin(this.time * 0.5) % 1, 1, 0.5), 
+            colorMix
+          );
         
         this.material.uniforms.offsetGain.value = frequencyData.mid * 0.6
         
