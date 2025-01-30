@@ -260,7 +260,11 @@ export class ReactiveParticles extends THREE.Object3D {
 
     // Create a points mesh using the cylinder geometry and shader material
     this.pointsMesh = new THREE.Points(this.geometry, this.material)
-    this.pointsMesh.rotation.set(Math.PI / 2, 0, 0) // Rotate the mesh for better orientation
+    this.pointsMesh.rotation.set(
+      THREE.MathUtils.randFloat(0, Math.PI * 2),
+      THREE.MathUtils.randFloat(0, Math.PI * 2),
+      THREE.MathUtils.randFloat(0, Math.PI * 2)
+    );
     this.holderObjects.add(this.pointsMesh)
 
     let rotY = 0
@@ -271,11 +275,13 @@ export class ReactiveParticles extends THREE.Object3D {
       posZ = this.basePosition.z + THREE.MathUtils.randFloat(-0.5, 0.5);
     }
 
-    gsap.to(this.holderObjects.rotation, {
-      duration: 0.2,
-      y: rotY,
-      ease: 'elastic.out(0.2)',
-    })
+    gsap.to(this.pointsMesh.rotation, {
+      duration: THREE.MathUtils.randFloat(2, 3),
+      x: THREE.MathUtils.randFloat(0, Math.PI * 2),
+      y: THREE.MathUtils.randFloat(0, Math.PI * 2),
+      z: THREE.MathUtils.randFloat(0, Math.PI * 2),
+      ease: 'power2.inOut'
+    });
 
     gsap.to(this.position, {
       duration: 0.6,
@@ -309,7 +315,14 @@ export class ReactiveParticles extends THREE.Object3D {
       })
     }
 
-    if (Math.random() < 0.3) this.resetMesh()
+    if (Math.random() < 0.2) this.resetMesh();
+  
+  // Ajouter un cooldown entre les changements
+  if (!this.changeCooldown) {
+    this.changeCooldown = setTimeout(() => {
+      this.changeCooldown = null;
+    }, 2000); // 2 secondes entre les changements possibles
+  }
   }
 
   resetMesh() {
