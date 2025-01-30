@@ -263,11 +263,7 @@ const Scene = () => {
             {/* Le terminal est maintenant un objet Three.js */}
             {isRendererReady && (
                 <>
-                    <EffectControls
-                        renderer={rendererRef.current}
-                        enabledPasses={enabledPasses}
-                        onTogglePass={handleTogglePass}
-                    />
+                    
                     <AudioControls
                         onPlay={handlePlay}
                         onPause={handlePause}
@@ -276,6 +272,10 @@ const Scene = () => {
                     <AudioDebug
                         analyser={audioManager.getAnalyser()}
                         isPlaying={isPlaying}
+                    />
+                     <PositionControls 
+                        terminal={terminalRef.current} 
+                        particles={reactiveParticlesRef.current} 
                     />
 
                 </>

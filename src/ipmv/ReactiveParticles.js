@@ -172,7 +172,8 @@ export class ReactiveParticles extends THREE.Object3D {
       autoMix: true,
       autoRotate: true,
     }
-    
+    this.basePosition = new THREE.Vector3(2.5, 23.5, 5); // Position fixe désirée
+    this.position.copy(this.basePosition);
     this.initialized = false
     this.pointsMesh = null
     this.holderObjects = new THREE.Object3D()
@@ -240,9 +241,9 @@ export class ReactiveParticles extends THREE.Object3D {
 
     gsap.to(this.position, {
       duration: 0.6,
-      z: THREE.MathUtils.randInt(9, 11), // Random depth positioning within a range
-      ease: 'elastic.out(0.8)', // Elastic ease-out for a bouncy effect
-    })
+      z: this.basePosition.z + THREE.MathUtils.randFloat(-0.2, 0.2), // Réduire la variation
+      ease: 'elastic.out(0.8)',
+    });
   }
 
   createCylinderMesh() {
@@ -263,11 +264,11 @@ export class ReactiveParticles extends THREE.Object3D {
     this.holderObjects.add(this.pointsMesh)
 
     let rotY = 0
-    let posZ = THREE.MathUtils.randInt(9, 11)
+    let posZ = this.basePosition.z + THREE.MathUtils.randFloat(-0.2, 0.2);
 
     if (Math.random() < 0.2) {
       rotY = Math.PI / 2
-      posZ = THREE.MathUtils.randInt(10, 11.5)
+      posZ = this.basePosition.z + THREE.MathUtils.randFloat(-0.5, 0.5);
     }
 
     gsap.to(this.holderObjects.rotation, {
@@ -361,7 +362,11 @@ export class ReactiveParticles extends THREE.Object3D {
     
       // Ajout spécifique à votre version pour le mouvement aléatoire
       if (Math.random() < 0.005) {
-        this.position.z = THREE.MathUtils.randFloat(9, 11)
+        this.position.set(
+          this.basePosition.x + THREE.MathUtils.randFloat(-0.05, 0.05),
+          this.basePosition.y + THREE.MathUtils.randFloat(-0.05, 0.05),
+          this.basePosition.z + THREE.MathUtils.randFloat(-0.1, 0.1)
+        );
       }
     }
 

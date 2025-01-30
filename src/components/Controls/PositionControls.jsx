@@ -85,36 +85,40 @@ const TransformGroup = ({ title, position, scale, onPositionChange, onScaleChang
     );
 };
 
-const PositionControls = ({ terminal, vortex }) => {
+const PositionControls = ({ terminal, particles }) => {
     // État initial pour le terminal
     const [terminalPosition, setTerminalPosition] = useState({
-        x: terminal.mesh.position.x,
-        y: terminal.mesh.position.y,
-        z: terminal.mesh.position.z
+        x: terminal?.mesh?.position?.x || 0,
+        y: terminal?.mesh?.position?.y || 0,
+        z: terminal?.mesh?.position?.z || 0
     });
+
     const [terminalScale, setTerminalScale] = useState({
-        x: terminal.mesh.scale.x,
-        y: terminal.mesh.scale.y,
-        z: terminal.mesh.scale.z
+        x: terminal?.mesh?.scale?.x || 1,
+        y: terminal?.mesh?.scale?.y || 1,
+        z: terminal?.mesh?.scale?.z || 1
     });
 
-    // État initial pour le vortex
-    const [vortexPosition, setVortexPosition] = useState({
-        x: vortex.mesh.position.x,
-        y: vortex.mesh.position.y,
-        z: vortex.mesh.position.z
-    });
-    const [vortexScale, setVortexScale] = useState({
-        x: vortex.mesh.scale.x,
-        y: vortex.mesh.scale.y,
-        z: vortex.mesh.scale.z
+    // État initial pour les particules réactives
+    const [particlesPosition, setParticlesPosition] = useState({
+        x: particles?.position?.x || 0,
+        y: particles?.position?.y || 0,
+        z: particles?.position?.z || 0
     });
 
-    // Gestionnaires de changements pour le terminal
+    const [particlesScale, setParticlesScale] = useState({
+        x: particles?.scale?.x || 1,
+        y: particles?.scale?.y || 1,
+        z: particles?.scale?.z || 1
+    });
+
+    // Gestionnaires pour le terminal
     const handleTerminalPositionChange = (axis, value) => {
         setTerminalPosition(prev => {
             const newPos = { ...prev, [axis]: value };
-            terminal.setPosition(newPos.x, newPos.y, newPos.z);
+            if(terminal?.mesh) {
+                terminal.mesh.position[axis] = newPos[axis];
+            }
             return newPos;
         });
     };
@@ -122,24 +126,30 @@ const PositionControls = ({ terminal, vortex }) => {
     const handleTerminalScaleChange = (axis, value) => {
         setTerminalScale(prev => {
             const newScale = { ...prev, [axis]: value };
-            terminal.mesh.scale.set(newScale.x, newScale.y, newScale.z);
+            if(terminal?.mesh) {
+                terminal.mesh.scale[axis] = newScale[axis];
+            }
             return newScale;
         });
     };
 
-    // Gestionnaires de changements pour le vortex
-    const handleVortexPositionChange = (axis, value) => {
-        setVortexPosition(prev => {
+    // Gestionnaires pour les particules
+    const handleParticlesPositionChange = (axis, value) => {
+        setParticlesPosition(prev => {
             const newPos = { ...prev, [axis]: value };
-            vortex.setPosition(newPos.x, newPos.y, newPos.z);
+            if(particles) {
+                particles.position[axis] = newPos[axis];
+            }
             return newPos;
         });
     };
 
-    const handleVortexScaleChange = (axis, value) => {
-        setVortexScale(prev => {
+    const handleParticlesScaleChange = (axis, value) => {
+        setParticlesScale(prev => {
             const newScale = { ...prev, [axis]: value };
-            vortex.setScale(newScale.x, newScale.y, newScale.z);
+            if(particles) {
+                particles.scale[axis] = newScale[axis];
+            }
             return newScale;
         });
     };
@@ -157,11 +167,11 @@ const PositionControls = ({ terminal, vortex }) => {
             />
 
             <TransformGroup
-                title="Vortex"
-                position={vortexPosition}
-                scale={vortexScale}
-                onPositionChange={handleVortexPositionChange}
-                onScaleChange={handleVortexScaleChange}
+                title="Particles System"
+                position={particlesPosition}
+                scale={particlesScale}
+                onPositionChange={handleParticlesPositionChange}
+                onScaleChange={handleParticlesScaleChange}
             />
         </div>
     );
