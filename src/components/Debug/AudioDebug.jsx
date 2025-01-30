@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from 'react';
+import * as THREE from 'three';
 
 export default function AudioDebug({ analyser, isPlaying }) {
     const canvasRef = useRef(null);
     const animationFrameRef = useRef(null);
+    const freqDataRef = useRef({ low: 0, mid: 0, high: 0 });
 
     useEffect(() => {
         if (!analyser || !isPlaying) return;
@@ -10,88 +12,84 @@ export default function AudioDebug({ analyser, isPlaying }) {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        // Paramètres synchronisés avec AudioManager
+        const FREQ_BANDS = {
+            LOW: 10,     // 10Hz
+            MID: 150,    // 150Hz
+            HIGH: 9000   // 9000Hz
+        };
+
+        const getFrequencyRange = (freq) => {
+            return Math.floor((freq * analyser.frequencyBinCount) / analyser.context.sampleRate);
+        };
+
+        const ranges = {
+            low: [getFrequencyRange(0), getFrequencyRange(FREQ_BANDS.LOW)],
+            mid: [getFrequencyRange(FREQ_BANDS.LOW), getFrequencyRange(FREQ_BANDS.MID)],
+            high: [getFrequencyRange(FREQ_BANDS.MID), getFrequencyRange(FREQ_BANDS.HIGH)]
+        };
 
         const draw = () => {
             animationFrameRef.current = requestAnimationFrame(draw);
-
             analyser.getByteFrequencyData(dataArray);
 
-            // Clear canvas
-            ctx.fillStyle = 'rgb(20, 20, 20)';
+            // Calcul des moyennes normalisées (comme dans AudioManager)
+            const calculateBand = (start, end) => {
+                let sum = 0;
+                for(let i = start; i <= end; i++) sum += dataArray[i];
+                return THREE.MathUtils.clamp((sum / (end - start + 1)) / 256, 0, 1);
+            };
+
+            freqDataRef.current = {
+                low: calculateBand(...ranges.low),
+                mid: calculateBand(...ranges.mid),
+                high: calculateBand(...ranges.high)
+            };
+
+            // Rendu visuel
+            ctx.fillStyle = 'rgb(10, 10, 20)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw FFT data
-            const barWidth = canvas.width / dataArray.length;
-            let x = 0;
-
-            // Calculer les moyennes pour les différentes bandes de fréquences
-            const lowEnd = Math.floor(dataArray.length * 0.1);    // 0-10% = basses
-            const midEnd = Math.floor(dataArray.length * 0.5);    // 10-50% = mediums
-            // 50-100% = aigus
-
-            let lowSum = 0, midSum = 0, highSum = 0;
-            let lowCount = 0, midCount = 0, highCount = 0;
-
-            dataArray.forEach((value, i) => {
-                // Dessiner la barre
-                const barHeight = (value / 255) * canvas.height;
-                
-                // Couleur selon la fréquence
-                let color;
-                if (i < lowEnd) {
-                    color = 'rgb(255, 50, 50)';
-                    lowSum += value;
-                    lowCount++;
-                } else if (i < midEnd) {
-                    color = 'rgb(50, 255, 50)';
-                    midSum += value;
-                    midCount++;
-                } else {
-                    color = 'rgb(50, 50, 255)';
-                    highSum += value;
-                    highCount++;
-                }
-                
+            // Visualisation des paramètres d'animation
+            const showParam = (value, y, color) => {
+                const width = value * canvas.width;
                 ctx.fillStyle = color;
-                ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-                
-                x += barWidth;
-            });
+                ctx.fillRect(0, y, width, 15);
+                ctx.fillStyle = 'white';
+                ctx.fillText(`${value.toFixed(2)}`, width + 5, y + 12);
+            };
 
-            // Calculer et afficher les moyennes
-            const lowAvg = lowSum / lowCount;
-            const midAvg = midSum / midCount;
-            const highAvg = highSum / highCount;
-
-            ctx.fillStyle = 'white';
+            // Affichage des données utilisées par les shaders
             ctx.font = '12px monospace';
-            ctx.fillText(`Low: ${lowAvg.toFixed(2)}`, 10, 15);
-            ctx.fillText(`Mid: ${midAvg.toFixed(2)}`, 10, 30);
-            ctx.fillText(`High: ${highAvg.toFixed(2)}`, 10, 45);
-            
-            // Afficher les valeurs utilisées dans le shader (0.1, 0.5, 0.9)
-            ctx.fillText(`Shader Low (0.1): ${dataArray[Math.floor(dataArray.length * 0.1)]}`, 10, 70);
-            ctx.fillText(`Shader Mid (0.5): ${dataArray[Math.floor(dataArray.length * 0.5)]}`, 10, 85);
-            ctx.fillText(`Shader High (0.9): ${dataArray[Math.floor(dataArray.length * 0.9)]}`, 10, 100);
+            showParam(freqDataRef.current.low, 20, 'rgba(255, 50, 50, 0.6)'); // Basse -> Amplitude
+            showParam(freqDataRef.current.mid, 40, 'rgba(50, 255, 50, 0.6)'); // Medium -> Offset
+            showParam(freqDataRef.current.high, 60, 'rgba(50, 50, 255, 0.6)'); // Haute -> Fréquence
+
+            // Légende dynamique
+            ctx.fillStyle = 'white';
+            ctx.fillText('Amplitude (Low)', 10, 18);
+            ctx.fillText('Offset Gain (Mid)', 10, 38);
+            ctx.fillText('Frequency (High)', 10, 58);
         };
 
         draw();
 
-        return () => {
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
-            }
-        };
+        return () => cancelAnimationFrame(animationFrameRef.current);
     }, [analyser, isPlaying]);
 
     return (
-        <div className="absolute top-4 left-4 bg-black/50 p-2 rounded">
+        <div className="absolute top-4 left-4 bg-black/80 p-3 rounded-lg shadow-xl">
             <canvas 
-                ref={canvasRef} 
-                width={300} 
-                height={120} 
-                className="border border-gray-700"
+                ref={canvasRef}
+                width={400}
+                height={80}
+                className="border-2 border-gray-800 rounded"
             />
+            <div className="mt-2 text-xs text-gray-400">
+                <p>Réactivité temps-réel: {analyser?.context?.sampleRate || 0}Hz</p>
+                <p>FFT Size: {analyser?.fftSize || 0} points</p>
+            </div>
         </div>
     );
 }
