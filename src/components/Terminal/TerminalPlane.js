@@ -11,9 +11,11 @@ export class TerminalPlane {
         this.texture.needsUpdate = true;
         
         // Création du matériau avec la texture
-        this.material = new THREE.MeshBasicMaterial({
+        this.material = new THREE.MeshStandardMaterial({
             map: this.texture,
-            transparent: true
+            transparent: true,
+            emissive: 0xffffff,
+            emissiveMap: this.texture
         });
         
         // Création de la géométrie du plane
