@@ -315,7 +315,17 @@ export class ReactiveParticles extends THREE.Object3D {
       })
     }
 
-    if (Math.random() < 0.2) this.resetMesh();
+    if (Math.random() < 0.2){
+      this.resetMesh();
+      gsap.to(this.material.uniforms.startColor.value, {
+        duration: 0.1,
+        r: Math.random(),
+        g: Math.random(),
+        b: Math.random(),
+        yoyo: true,
+        repeat: 1
+      });
+    } 
   
   // Ajouter un cooldown entre les changements
   if (!this.changeCooldown) {
@@ -355,7 +365,6 @@ export class ReactiveParticles extends THREE.Object3D {
       const isPlaying = this.audioManager?.isPlaying
       const frequencyData = this.audioManager?.frequencyData
     
-      // Partie inchangée d'IPMV
       if (isPlaying && frequencyData) {
         this.material.uniforms.amplitude.value = 0.8 + 
           THREE.MathUtils.mapLinear(frequencyData.high, 0, 0.6, -0.1, 0.2)
