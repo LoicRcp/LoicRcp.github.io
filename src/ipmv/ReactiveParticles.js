@@ -134,6 +134,7 @@ void main() {
 vec3 target = position + baseOffset + curlOffset * curlIntensity;
     
   float d = length(newpos - target) / maxDistance;
+
   newpos = mix(position, target, pow(d, 4.));
   
   // Déplacements audio-réactifs
@@ -142,7 +143,7 @@ vec3 target = position + baseOffset + curlOffset * curlIntensity;
   sin(time * 12.0) * pow(lowFreq, bassPower) * 0.03,
   cos(time * 10.0) * pow(midFreq, midPower) * 0.02,
   sin(time * 8.0 * exp(-lowFreq * 2.0)) * lowFreq * 0.05
-);
+  );
 
   // Combinaison harmonieuse
   newpos += mix(vec3(0.0), audioOffset, audioInfluence);
@@ -152,12 +153,14 @@ vec3 target = position + baseOffset + curlOffset * curlIntensity;
   gl_PointSize = size + (pow(d,3.) * offsetSize) * (1./-mvPosition.z);
   gl_Position = projectionMatrix * mvPosition;
   
-  vDistance = d;
+  vDistance = smoothstep(0.3, 0.7, d * 0.8 + 0.1);
 }`;
 const fragment = `varying float vDistance;
 
 uniform vec3 startColor;
 uniform vec3 endColor;
+uniform float colorBalance;
+uniform float gammaCorrection;
 
 float circle(in vec2 _st,in float _radius){
   vec2 dist=_st-vec2(.5);
@@ -167,13 +170,26 @@ float circle(in vec2 _st,in float _radius){
 }
 
 void main(){
-  float alpha=1.;
+
+  float t = mix(vDistance, 1.0 - vDistance, colorBalance);
+
+  vec3 start = pow(startColor, vec3(gammaCorrection));
+  vec3 end = pow(endColor, vec3(gammaCorrection));
+
+  
+
+  
+
+
+  
   vec2 uv = vec2(gl_PointCoord.x,1.-gl_PointCoord.y);
   vec3 circ = vec3(circle(uv,1.));
 
-  vec3 color=vec3(1.);
-  color = mix(startColor,endColor,vDistance);
-  gl_FragColor=vec4(color,circ.r * vDistance);
+  vec3 color = mix(start, end, smoothstep(0.25, 0.75, t));
+  color = pow(color, vec3(1.0/gammaCorrection));
+  float alpha = circ.r * (1.0 - 0.5 * t);
+
+  gl_FragColor = vec4(color, alpha);
 }`;
 
 export class ReactiveParticles extends THREE.Object3D {
@@ -231,6 +247,8 @@ export class ReactiveParticles extends THREE.Object3D {
         bassPower: { value: 2.0 },
         midPower: { value: 1.5 },
         curlIntensity: { value: 1.0 },
+        colorBalance: { value: 0.5 },
+        gammaCorrection: { value: 1.0 },
 
         startColor: { value: new THREE.Color(this.properties.startColor) },
         endColor: { value: new THREE.Color(this.properties.endColor) },
