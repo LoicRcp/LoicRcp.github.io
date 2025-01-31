@@ -39,7 +39,7 @@ const Scene = () => {
             } else {
                 clearInterval(timer);
             }
-        }, 50);
+        }, 15);
 
         return () => clearInterval(timer);
     }, [currentSection]);
@@ -178,7 +178,7 @@ const Scene = () => {
 
         // Terminal
         const terminal = new TerminalPlane(8, 6);
-        terminal.setPosition(-1.8, 25, 7);
+        terminal.setPosition(-2, 25, 5.5);
         terminal.mesh.rotation.x = -Math.PI / 2;
 
         terminalRef.current = terminal;
@@ -288,31 +288,30 @@ const Scene = () => {
 
     return (
         <div className="relative w-full h-full">
-            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
-            {/* Le terminal est maintenant un objet Three.js */}
-            {isRendererReady && (
-                <>
-                    { <AudioControls
-                        onPlay={handlePlay}
-                        onPause={handlePause}
-                        onNext={handleNext}
-                        isPlaying={isPlaying}
-                        isAudioReady={!!audioManager.audio?.buffer}
-                        playlistLength={audioManager.playlist.length}
-                        volume={volume}
-                        onVolumeChange={handleVolumeChange}
-                        progress={progress} 
-                    />/*
-                    <AudioDebug
-                        analyser={audioManager.getAnalyser()}
-                        isPlaying={isPlaying}
-                    />
-                    <ParticleControls particles={reactiveParticlesRef.current} /> */}
-                    <JokeButton />
-                </>
-            )}
+          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+          
+        /* Navbar unifiée en haut */}
+                  {isRendererReady && (
+                    <div className="absolute top-0 left-0 right-0 flex justify-between items-start pt-4 px-4 pb-0 backdrop-blur-sm border-cyan-electric/30 crt-overlay">
+                      {/* Contrôle audio avec progress bar */}
+              <AudioControls
+                onPlay={handlePlay}
+                onPause={handlePause}
+                onNext={handleNext}
+                isPlaying={isPlaying}
+                isAudioReady={!!audioManager.audio?.buffer}
+                playlistLength={audioManager.playlist.length}
+                volume={volume}
+                onVolumeChange={handleVolumeChange}
+                progress={progress}
+              />
+    
+              {/* Bouton Blague intégré à droite */}
+              <JokeButton />
+            </div>
+          )}
         </div>
-    );
-};
+      );
+    };
 
 export default Scene;

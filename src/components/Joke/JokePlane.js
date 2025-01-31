@@ -33,7 +33,7 @@ export class JokePlane {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, textCanvas.width, textCanvas.height);
         ctx.font = 'bold 20px monospace';
-        ctx.fillStyle = '#33ff33';
+        ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 

@@ -9,7 +9,7 @@ export class TextRenderer {
         // Configuration par défaut du texte
         this.fontSize = 24;
         this.lineHeight = 1.5;
-        this.padding = 40;
+        this.padding = 160;
         this.color = '#00ff00';
         
         // Clear initial
