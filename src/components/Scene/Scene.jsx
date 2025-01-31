@@ -120,10 +120,9 @@ const Scene = () => {
 
     const handleNext = async () => {
         try {
-            const wasPlaying = audioManager.isPlaying;
+            const wasPlaying = isPlaying;
             if (wasPlaying) await audioManager.pause();
-
-            
+    
             await audioManager.nextTrack();
             setProgress(0);
             
