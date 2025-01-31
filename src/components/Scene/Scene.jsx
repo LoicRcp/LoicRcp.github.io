@@ -289,8 +289,6 @@ const Scene = () => {
     return (
         <div className="relative w-full h-full">
           <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
-          
-        /* Navbar unifiée en haut */}
                   {isRendererReady && (
                     <div className="absolute top-0 left-0 right-0 flex justify-between items-start pt-4 px-4 pb-0 backdrop-blur-sm border-cyan-electric/30 crt-overlay">
                       {/* Contrôle audio avec progress bar */}
