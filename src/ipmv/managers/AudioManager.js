@@ -1,6 +1,4 @@
 import * as THREE from 'three'
-const fs = require('fs');
-const path = require('path');
 
 export class AudioManager {
   constructor() {
@@ -12,6 +10,8 @@ export class AudioManager {
     this.dataArray = null;
     this.playlist = [];
     this.currentTrackIndex = 0;
+    this.volume = 0.1;
+
     
     // Plages de fréquences
     this.lowFrequency = 60;    // Basses (60-250Hz)
@@ -23,29 +23,17 @@ export class AudioManager {
   }
 
   initializeRandomPlaylist() {
-    const audioDir = path.join(process.cwd(), 'public', 'audio');
-    let songs = [];
-    
-    try {
-        // Get all files from audio directory
-        const files = fs.readdirSync(audioDir);
-        
-        // Filter for audio files
-        songs = files
-            .filter(file => ['.mp3', '.wav', '.ogg'].includes(path.extname(file)))
-            .map(file => `audio/${file}`);
-            
-        if (songs.length === 0) {
-            console.warn('No audio files found in public/audio directory');
-            return;
-        }
-    } catch (error) {
-        console.error('Error reading audio directory:', error);
-        return;
-    }
-
+    const songs = [
+    "audio/04ff5a619f64432b8d19788bfa31b114.mp3",
+    "audio/16953d87c47746cebe794688c19dd2d4.mp3",
+    "audio/50431fa7adde4a638a13e6f6ee781a1e.mp3",
+    "audio/5f55126cc5ce4c77bedf2e3545fadbbd.mp3",
+    "audio/e4e2b0a4d9be4e8bb8e3402e277fcca7.mp3",
+    "audio/spotify_preview_aad44685e5f948b6b7546fe80a976ea8.mp3",
+    "audio/spotify_preview_bc86ec80bf1d4fb2b215df2e17b98e24.mp3"
+];
     this.playlist = songs.sort(() => Math.random() - 0.5);
-  }
+}
 
   async loadAudioBuffer() {
     return new Promise((resolve, reject) => {
