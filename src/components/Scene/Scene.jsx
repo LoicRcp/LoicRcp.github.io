@@ -17,6 +17,10 @@ const Scene = () => {
     const terminalRef = useRef(null);
     const [currentSection, setCurrentSection] = useState(0);
     const [displayedText, setDisplayedText] = useState('');
+    const [volume, setVolume] = useState(0.1);
+    const [progress, setProgress] = useState(0);
+
+
 
     // Hook typewriter pour le terminal Three.js
     useEffect(() => {
@@ -63,7 +67,12 @@ const Scene = () => {
     const [isRendererReady, setIsRendererReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const reactiveParticlesRef = useRef(null);
-    const [audioManager] = useState(() => new AudioManager());
+    const [audioManager] = useState(() => {
+        const am = new AudioManager();
+        am.maxDecibels = -3; // Niveau maximal absolu (-3dB FS)
+        am.minDecibels = -24; // Niveau minimal (-24dB)
+        return am;
+    });
     const [bpmManager] = useState(() => new BPMManager());
 
 
@@ -116,13 +125,17 @@ const Scene = () => {
             }
             
             await audioManager.nextTrack();
+            setProgress(0); // Reset la progression
             
-            // Re-détecter le BPM
             if (audioManager.audio?.buffer) {
                 await bpmManager.detectBPM(audioManager.audio.buffer);
             }
             
             if (wasPlaying) {
+                // S'assurer que le contexte audio est réactivé
+                if (audioManager.audioContext?.state === 'suspended') {
+                    await audioManager.audioContext.resume();
+                }
                 await audioManager.play();
                 reactiveParticlesRef.current?.resetMesh();
             }
@@ -193,11 +206,20 @@ const Scene = () => {
 
         // Animation loop
         let frameId;
+        let lastProgressUpdate = 0;
         const animate = () => {
             frameId = requestAnimationFrame(animate);
 
             if (audioManager?.isPlaying) {
                 audioManager.update();
+
+                const now = Date.now();
+                if (now - lastProgressUpdate >= 100) {
+                    const currentTime = audioManager.getCurrentTime();
+                    const duration = audioManager.currentTrackDuration || 1;
+                    setProgress((currentTime / duration) * 100);
+                    lastProgressUpdate = now;
+                }
             }
             if (reactiveParticlesRef.current?.update) {
                 reactiveParticlesRef.current.update();
@@ -258,6 +280,11 @@ const Scene = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    const handleVolumeChange = (newVolume) => {
+        audioManager.setVolume(newVolume);
+        setVolume(newVolume);
+    };
+
     return (
         <div className="relative w-full h-full">
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
@@ -271,6 +298,9 @@ const Scene = () => {
                         isPlaying={isPlaying}
                         isAudioReady={!!audioManager.audio?.buffer}
                         playlistLength={audioManager.playlist.length}
+                        volume={volume}
+                        onVolumeChange={handleVolumeChange}
+                        progress={progress} 
                     />
                     <AudioDebug
                         analyser={audioManager.getAnalyser()}
