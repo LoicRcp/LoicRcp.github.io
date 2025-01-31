@@ -445,6 +445,135 @@ export class ReactiveParticles extends THREE.Object3D {
     });
   }
 
+  createOctahedronMesh() {
+    const radius = THREE.MathUtils.randFloat(0.5, 2);
+    const detail = THREE.MathUtils.randInt(0, 2);
+    this.geometry = new THREE.OctahedronGeometry(radius, detail);
+  
+    this.material.uniforms.offsetSize.value = THREE.MathUtils.randInt(30, 60);
+    this.material.uniforms.size.value = 1.1;
+    this.material.needsUpdate = true;
+  
+    this.pointsMesh = new THREE.Points(this.geometry, this.material);
+    this.pointsMesh.rotation.set(
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI)
+    );
+    this.holderObjects.add(this.pointsMesh);
+  
+    gsap.to(this.pointsMesh.rotation, {
+      duration: THREE.MathUtils.randFloat(5, 10),
+      x: Math.random() * Math.PI * 2,
+      y: Math.random() * Math.PI * 2,
+      z: Math.random() * Math.PI * 2,
+      ease: 'power2.inOut'
+    });
+  
+    gsap.to(this.position, {
+      duration: 0.6,
+      z: this.basePosition.z + THREE.MathUtils.randFloat(-0.2, 0.2),
+      ease: 'elastic.out(0.8)',
+    });
+  }
+  
+  createConeMesh() {
+    const radius = THREE.MathUtils.randFloat(0.1, 1);
+    const height = THREE.MathUtils.randFloat(1, 3);
+    const radialSegments = THREE.MathUtils.randInt(8, 32);
+    const heightSegments = THREE.MathUtils.randInt(1, 5);
+    this.geometry = new THREE.ConeGeometry(radius, height, radialSegments, heightSegments);
+  
+    this.material.uniforms.offsetSize.value = THREE.MathUtils.randInt(30, 60);
+    this.material.uniforms.size.value = 2;
+    this.material.needsUpdate = true;
+  
+    this.pointsMesh = new THREE.Points(this.geometry, this.material);
+    this.pointsMesh.rotation.set(
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI)
+    );
+    this.holderObjects.add(this.pointsMesh);
+  
+    gsap.to(this.pointsMesh.rotation, {
+      duration: THREE.MathUtils.randFloat(2, 4),
+      x: Math.random() * Math.PI * 2,
+      y: Math.random() * Math.PI * 2,
+      ease: 'power2.inOut'
+    });
+  
+    gsap.to(this.position, {
+      duration: 0.6,
+      z: this.basePosition.z + THREE.MathUtils.randFloat(-0.5, 0.5),
+      ease: 'elastic.out(0.8)',
+    });
+  }
+  
+  createRingMesh() {
+    const innerRadius = THREE.MathUtils.randFloat(0.1, 0.5);
+    const outerRadius = THREE.MathUtils.randFloat(0.6, 2);
+    const thetaSegments = THREE.MathUtils.randInt(8, 64);
+    this.geometry = new THREE.RingGeometry(innerRadius, outerRadius, thetaSegments);
+  
+    this.material.uniforms.offsetSize.value = THREE.MathUtils.randInt(30, 60);
+    this.material.uniforms.size.value = 1.5;
+    this.material.needsUpdate = true;
+  
+    this.pointsMesh = new THREE.Points(this.geometry, this.material);
+    this.pointsMesh.rotation.set(
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI)
+    );
+    this.holderObjects.add(this.pointsMesh);
+  
+    gsap.to(this.pointsMesh.rotation, {
+      duration: THREE.MathUtils.randFloat(3, 6),
+      x: Math.random() * Math.PI * 2,
+      z: Math.random() * Math.PI * 2,
+      ease: 'power2.inOut'
+    });
+  
+    gsap.to(this.position, {
+      duration: 0.6,
+      y: this.basePosition.y + THREE.MathUtils.randFloat(-0.3, 0.3),
+      ease: 'elastic.out(0.8)',
+    });
+  }
+  
+  createGridMesh() {
+    const width = THREE.MathUtils.randFloat(1, 3);
+    const height = THREE.MathUtils.randFloat(1, 3);
+    const widthSegments = THREE.MathUtils.randInt(10, 50);
+    const heightSegments = THREE.MathUtils.randInt(10, 50);
+    this.geometry = new THREE.PlaneGeometry(width, height, widthSegments, heightSegments);
+  
+    this.material.uniforms.offsetSize.value = THREE.MathUtils.randInt(30, 60);
+    this.material.uniforms.size.value = 1.1;
+    this.material.needsUpdate = true;
+  
+    this.pointsMesh = new THREE.Points(this.geometry, this.material);
+    this.pointsMesh.rotation.set(
+      Math.PI / 2,
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI)
+    );
+    this.holderObjects.add(this.pointsMesh);
+  
+    gsap.to(this.pointsMesh.rotation, {
+      duration: THREE.MathUtils.randFloat(5, 10),
+      y: Math.random() * Math.PI * 2,
+      ease: 'power2.inOut'
+    });
+  
+    gsap.to(this.position, {
+      duration: 0.6,
+      x: this.basePosition.x + THREE.MathUtils.randFloat(-0.5, 0.5),
+      ease: 'elastic.out(0.8)',
+    });
+  }
+
   connectAudio(audioManager) {
     if (!audioManager?.update) { // Vérification plus flexible
       console.error('AudioManager invalide:', audioManager);
@@ -530,16 +659,24 @@ export class ReactiveParticles extends THREE.Object3D {
     this.destroyMesh()
     const r = Math.random()
     
-    if (r < 0.3) {
+    if (r < 0.25) {
       this.createBoxMesh()
-    } else if (r < 0.6) {
+    } else if (r < 0.5) {
       this.createCylinderMesh()
-    } else if (r < 0.75) {
+    } else if (r < 0.6) {
       this.createSphereMesh()
-    } else if (r < 0.9) {
+    } else if (r < 0.7) {
       this.createTorusMesh()
-    } else {
+    } else if (r < 0.75) {
       this.createIcosahedronMesh()
+    } else if (r < 0.8) {
+      this.createOctahedronMesh()
+    } else if (r < 0.85) {
+      this.createConeMesh()
+    } else if (r < 0.9) {
+      this.createRingMesh()
+    } else {
+      this.createGridMesh()
     }
 
     const [color1, color2] = ColorHarmony.getRandomPair();
