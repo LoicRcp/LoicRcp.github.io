@@ -11,6 +11,7 @@ import AudioControls from '../Controls/AudioControls';
 import AudioDebug from '../Debug/AudioDebug';
 import PositionControls from '../Controls/PositionControls';
 import ParticleControls from '../Controls/ParticleControls';
+import JokeButton from '../Joke/JokeButton';
 
 
 const Scene = () => {
@@ -165,6 +166,7 @@ const Scene = () => {
     useEffect(() => {
         // Scène et caméra
         const scene = new THREE.Scene();
+        window.scene = scene;  // Rendre la scène accessible globalement
         sceneRef.current = scene;
         scene.background = new THREE.Color(0x000000);
 
@@ -257,6 +259,9 @@ const Scene = () => {
             while (scene.children.length > 0) {
                 scene.remove(scene.children[0]);
             }
+            
+            // Nettoyer la référence globale à la scène
+            delete window.scene;
         };
     }, [audioManager, bpmManager]); // Empty dependency array
     useEffect(() => {
@@ -288,7 +293,7 @@ const Scene = () => {
             {/* Le terminal est maintenant un objet Three.js */}
             {isRendererReady && (
                 <>
-                    <AudioControls
+                    {/* <AudioControls
                         onPlay={handlePlay}
                         onPause={handlePause}
                         onNext={handleNext}
@@ -303,9 +308,8 @@ const Scene = () => {
                         analyser={audioManager.getAnalyser()}
                         isPlaying={isPlaying}
                     />
-                      <ParticleControls particles={reactiveParticlesRef.current} />
-
-
+                    <ParticleControls particles={reactiveParticlesRef.current} /> */}
+                    <JokeButton />
                 </>
             )}
         </div>
