@@ -107,7 +107,7 @@ export class AudioManager {
     "audio/spotify_preview_aad44685e5f948b6b7546fe80a976ea8.mp3",
     "audio/spotify_preview_bc86ec80bf1d4fb2b215df2e17b98e24.mp3"
 ];
-    this.playlist = songs;//.sort(() => Math.random() - 0.5);
+    this.playlist = songs.sort(() => Math.random() - 0.5);
 }
 
 async loadAudioBuffer() {
