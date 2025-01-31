@@ -119,8 +119,8 @@ async loadAudioBuffer() {
     }
 
     this.audio = new THREE.Audio(this.audioListener);
-    this.audio.setVolume(1); // Volume fixe, contrôlé par masterGain
-    // Reconnexion au masterGain
+    this.audio.setVolume(1);
+
     this.audio.gain.disconnect();
     this.audio.gain.connect(this.masterGain);
 
@@ -133,6 +133,10 @@ async loadAudioBuffer() {
         this.audio.onEnded = () => {
           this.nextTrack().catch(console.error);
         };
+
+        this.analyser = new THREE.AudioAnalyser(this.audio, 1024);
+        this.dataArray = new Uint8Array(this.analyser.analyser.frequencyBinCount)
+
         this.audioContext = this.audio.context;
         resolve();
       },
@@ -151,6 +155,11 @@ async loadAudioBuffer() {
   }
   async nextTrack() {
     const wasPlaying = this.isPlaying;
+
+    this.trackStartTime = 0;
+    this.pauseTime = 0;
+    this.currentTrackDuration = 0;
+
 
     // Arrêter proprement la lecture actuelle
     if (this.audio) {

@@ -293,7 +293,7 @@ const Scene = () => {
             {/* Le terminal est maintenant un objet Three.js */}
             {isRendererReady && (
                 <>
-                    {/* <AudioControls
+                    { <AudioControls
                         onPlay={handlePlay}
                         onPause={handlePause}
                         onNext={handleNext}
@@ -303,7 +303,7 @@ const Scene = () => {
                         volume={volume}
                         onVolumeChange={handleVolumeChange}
                         progress={progress} 
-                    />
+                    />/*
                     <AudioDebug
                         analyser={audioManager.getAnalyser()}
                         isPlaying={isPlaying}
