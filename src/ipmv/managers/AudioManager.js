@@ -70,62 +70,84 @@ export class AudioManager {
 
   initializeRandomPlaylist() {
     const songs = [
-      "audio/04ff5a619f64432b8d19788bfa31b114.mp3",
-      "audio/16953d87c47746cebe794688c19dd2d4.mp3",
-      "audio/50431fa7adde4a638a13e6f6ee781a1e.mp3",
-      "audio/5f55126cc5ce4c77bedf2e3545fadbbd.mp3",
-      "audio/e4e2b0a4d9be4e8bb8e3402e277fcca7.mp3",
-      "audio/spotify_preview_aad44685e5f948b6b7546fe80a976ea8.mp3",
-      "audio/spotify_preview_bc86ec80bf1d4fb2b215df2e17b98e24.mp3"
-    ];
-    this.playlist = songs.sort(() => Math.random() - 0.5);
-  }
+    "audio/04ff5a619f64432b8d19788bfa31b114.mp3",
+    "audio/0f5d9291759b42d3b6ad2a59ffd0485a.mp3",
+    "audio/16953d87c47746cebe794688c19dd2d4.mp3",
+    "audio/1c8ce5b7066941f995efb0e4c5077302.mp3",
+    "audio/2044ef37dd834697ad70ddb1247a55df.mp3",
+    "audio/2214218bb27f4daf9f3130cc322177ed.mp3",
+    "audio/2240819062dc4fa7ab137700819ad362.mp3",
+    "audio/3a36c4f1232e447fb72fcc7298644c62.mp3",
+    "audio/50431fa7adde4a638a13e6f6ee781a1e.mp3",
+    "audio/5f55126cc5ce4c77bedf2e3545fadbbd.mp3",
+    "audio/5fdb7c14b3a449c88a7d1fdee5d24688.mp3",
+    "audio/6357bcceec5d4d059983370e8ae0a987.mp3",
+    "audio/6a913076c87c4b189cc56256d7f6feb0.mp3",
+    "audio/7832845695be4ceb8c3b6e19654b754f.mp3",
+    "audio/8eea22cc4f5d4596ae4a112073b0f763.mp3",
+    "audio/908f6f9a29ca4649a21071d268a8dfe1.mp3",
+    "audio/97dabd8a6678450eafff2ddb9ae64f92.mp3",
+    "audio/b9ad1dcfa365403e80021b204c454b4a.mp3",
+    "audio/bc419c955dc040fb992564302ee00da7.mp3",
+    "audio/bfe13561b76844bb9230682f6c900186.mp3",
+    "audio/c916bda2dbb04f8cac682ba817161374.mp3",
+    "audio/c9c995059374420588c1366a9ed2f442.mp3",
+    "audio/caf4a0d41cd44a9bb3210c8adc70f05a.mp3",
+    "audio/d515c0f897f04ad79344babae84a98ec.mp3",
+    "audio/d56efa13099f4324845bca901243c19c.mp3",
+    "audio/d83bb30e020b4b128f010c4937100d4e.mp3",
+    "audio/df1f7b0b3a50436689728c6894ee8543.mp3",
+    "audio/e1281d91f4494b908adcbef07e5ce588.mp3",
+    "audio/e2b677e4b1204a1cab36dd2708cd412a.mp3",
+    "audio/e4e2b0a4d9be4e8bb8e3402e277fcca7.mp3",
+    "audio/e63c33e1c39d4c9eb48c52e232cb2441.mp3",
+    "audio/ec58d76ae5c546218efcf7b1300b0e93.mp3",
+    "audio/ed816b7cd3924eb2a268f6065fab85da.mp3",
+    "audio/f2215a7ab26747e788613e0c6855ff05.mp3",
+    "audio/spotify_preview_aad44685e5f948b6b7546fe80a976ea8.mp3",
+    "audio/spotify_preview_bc86ec80bf1d4fb2b215df2e17b98e24.mp3"
+];
+    this.playlist = songs;//.sort(() => Math.random() - 0.5);
+}
 
-  async loadAudioBuffer() {
-    return new Promise((resolve, reject) => {
-      // Nettoyage complet
-      if (this.audio) {
-        this.audio.stop();
-        this.audio.disconnect();
-        this.audio = null;
-      }
+async loadAudioBuffer() {
+  return new Promise((resolve, reject) => {
+    if (this.audio) {
+      this.audio.stop();
+      this.audio.disconnect();
+      this.audio = null;
+    }
 
-      this.audio = new THREE.Audio(this.audioListener);
-      this.audio.setVolume(this.volume);
+    this.audio = new THREE.Audio(this.audioListener);
+    this.audio.setVolume(1); // Volume fixe, contrôlé par masterGain
+    // Reconnexion au masterGain
+    this.audio.gain.disconnect();
+    this.audio.gain.connect(this.masterGain);
 
-
-      // Chargement
-      new THREE.AudioLoader().load(
-        this.playlist[this.currentTrackIndex],
-        (buffer) => {
-          this.audio.setBuffer(buffer);
-          this.currentTrackDuration = buffer.duration;
-          this.audio.setLoop(false);
-          this.audio.onEnded = () => {
-            this.nextTrack().catch(console.error);
-          };
-          this.audioContext = this.audio.context;
-
-          resolve();
-        },
-        null,
-        reject
-      );
-      this.analyser = new THREE.AudioAnalyser(this.audio, 1024);
-      this.bufferLength = this.analyser.data.length;
-      this.dataArray = new Uint8Array(this.analyser.analyser.frequencyBinCount);
-    });
-  }
+    new THREE.AudioLoader().load(
+      this.playlist[this.currentTrackIndex],
+      (buffer) => {
+        this.audio.setBuffer(buffer);
+        this.currentTrackDuration = buffer.duration;
+        this.audio.setLoop(false);
+        this.audio.onEnded = () => {
+          this.nextTrack().catch(console.error);
+        };
+        this.audioContext = this.audio.context;
+        resolve();
+      },
+      null,
+      reject
+    );
+    this.analyser = new THREE.AudioAnalyser(this.audio, 1024);
+    this.dataArray = new Uint8Array(this.analyser.analyser.frequencyBinCount);
+  });
+}
   setVolume(linearValue) {
-    // Convertit la valeur linéaire (0-1) en plage dB
-    const dbValue = this.minDecibels +
+    const dbValue = this.minDecibels + 
       (linearValue * (this.maxDecibels - this.minDecibels));
-
     this.volume = this.dbToGain(dbValue);
     this.updateGain();
-    if (this.audio) {
-      this.audio.setVolume(this.volume);
-    }
   }
   async nextTrack() {
     const wasPlaying = this.isPlaying;
@@ -139,8 +161,6 @@ export class AudioManager {
 
     // Changer de piste
     this.currentTrackIndex = (this.currentTrackIndex + 1) % this.playlist.length;
-
-    this.currentTrackDuration = 0;
 
     // Recharger le buffer
     await this.loadAudioBuffer();

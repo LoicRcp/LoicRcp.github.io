@@ -152,8 +152,8 @@ vec3 target = position + baseOffset + curlOffset * curlIntensity;
   vec4 mvPosition = modelViewMatrix * vec4(newpos, 1.);
   gl_PointSize = size + (pow(d,3.) * offsetSize) * (1./-mvPosition.z);
   gl_Position = projectionMatrix * mvPosition;
-  
-  vDistance = smoothstep(0.3, 0.7, d * 0.8 + 0.1);
+
+  vDistance = smoothstep(0.2, 0.8, d * 0.6 + 0.2);
 }`;
 const fragment = `varying float vDistance;
 
@@ -186,7 +186,10 @@ void main(){
   vec3 circ = vec3(circle(uv,1.));
 
   vec3 color = mix(start, end, smoothstep(0.1, 0.9, t * 1.2 - 0.1));
-  color = pow(color, vec3(1.0/gammaCorrection));
+  float saturation = mix(1.2, 1.5, pow(vDistance, 2.0));
+
+  color = mix(vec3(dot(color, vec3(0.299, 0.587, 0.114))), color, saturation);
+
   float alpha = circ.r * mix(0.8, 1.2, abs(t - 0.5));
 
   gl_FragColor = vec4(color, alpha);
@@ -590,6 +593,12 @@ export class ReactiveParticles extends THREE.Object3D {
       
       this.material.uniforms.time.value = this.time;
       
+      const energy = THREE.MathUtils.clamp((low + mid) * 0.8, 0, 1);
+      this.material.uniforms.colorBalance.value = THREE.MathUtils.lerp(
+        this.material.uniforms.colorBalance.value,
+        energy > 0.7 ? 0.3 : 0.5 + mid * 0.2,
+        0.1
+      );
       
       
     }

@@ -120,25 +120,22 @@ const Scene = () => {
     const handleNext = async () => {
         try {
             const wasPlaying = audioManager.isPlaying;
-            if (wasPlaying) {
-                await audioManager.pause();
-            }
+            if (wasPlaying) await audioManager.pause();
+
             
             await audioManager.nextTrack();
-            setProgress(0); // Reset la progression
+            setProgress(0);
             
             if (audioManager.audio?.buffer) {
                 await bpmManager.detectBPM(audioManager.audio.buffer);
             }
             
             if (wasPlaying) {
-                // S'assurer que le contexte audio est réactivé
                 if (audioManager.audioContext?.state === 'suspended') {
-                    await audioManager.audioContext.resume();
+                  await audioManager.audioContext.resume();
                 }
                 await audioManager.play();
-                reactiveParticlesRef.current?.resetMesh();
-            }
+              }
         } catch (error) {
             console.error('Erreur changement piste:', error);
         }
