@@ -217,7 +217,7 @@ export class ReactiveParticles extends THREE.Object3D {
     bassPowerLimits: { min: 0.5, max: 4 },
     midPowerLimits: { min: 0.5, max: 3 },
     }
-    this.basePosition = new THREE.Vector3(3.5, 23.5, 5); // Position fixe désirée
+    this.basePosition = new THREE.Vector3(3.0, 23.5, 5); // Position fixe désirée
     this.position.copy(this.basePosition);
     this.scale.set(2,2,2);
     

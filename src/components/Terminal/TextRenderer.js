@@ -14,6 +14,11 @@ export class TextRenderer {
         
         // Clear initial
         this.clear();
+
+        // Remove or modify the green screen blend
+        this.ctx.globalCompositeOperation = 'source-over'; // Change from 'screen'
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0)'; // Transparent background instead of green
+        this.ctx.fillRect(0, 0, this.width, this.height);
     }
 
     clear() {
@@ -88,11 +93,9 @@ export class TextRenderer {
             this.ctx.fillText(line, this.padding, y);
         }
 
-        this.ctx.globalCompositeOperation = 'screen';
-        this.ctx.fillStyle = 'rgba(50, 255, 50, 0.1)';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.globalCompositeOperation = 'source-over';
-        
+        // Remove any green tinting if present in the render method
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+
         // Add random CRT sparkles
         if(Math.random() < 0.02) {
         this.ctx.fillStyle = '#fff';
