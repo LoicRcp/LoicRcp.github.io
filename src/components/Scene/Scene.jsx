@@ -10,6 +10,8 @@ import { AudioManager } from '../../ipmv/managers/AudioManager';
 import AudioControls from '../Controls/AudioControls';
 import AudioDebug from '../Debug/AudioDebug';
 import PositionControls from '../Controls/PositionControls';
+import ParticleControls from '../Controls/ParticleControls';
+
 
 const Scene = () => {
     const terminalRef = useRef(null);
@@ -182,7 +184,7 @@ const Scene = () => {
         const particles = new ReactiveParticles({
             audioManager,
             bpmManager,
-            camera: cameraRef.current
+            camera: cameraRef.current,
         });
         particles.init();
         scene.add(particles);
@@ -274,6 +276,8 @@ const Scene = () => {
                         analyser={audioManager.getAnalyser()}
                         isPlaying={isPlaying}
                     />
+                      <ParticleControls particles={reactiveParticlesRef.current} />
+
 
                 </>
             )}

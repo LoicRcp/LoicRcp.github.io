@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+const fs = require('fs');
+const path = require('path');
 
 export class AudioManager {
   constructor() {
@@ -12,16 +14,36 @@ export class AudioManager {
     this.currentTrackIndex = 0;
     
     // Plages de fréquences
-    this.lowFrequency = 10;
-    this.midFrequency = 150;
-    this.highFrequency = 9000;
+    this.lowFrequency = 60;    // Basses (60-250Hz)
+    this.midFrequency = 250;   // Medium (250Hz-2kHz)
+    this.highFrequency = 2000; // Aigus (2kHz+)
     this.bufferLength = 0;
 
     this.initializeRandomPlaylist();
   }
 
   initializeRandomPlaylist() {
-    const songs = ['audio/techno.mp3', 'audio/techno2.mp3', 'audio/techno3.mp3'];
+    const audioDir = path.join(process.cwd(), 'public', 'audio');
+    let songs = [];
+    
+    try {
+        // Get all files from audio directory
+        const files = fs.readdirSync(audioDir);
+        
+        // Filter for audio files
+        songs = files
+            .filter(file => ['.mp3', '.wav', '.ogg'].includes(path.extname(file)))
+            .map(file => `audio/${file}`);
+            
+        if (songs.length === 0) {
+            console.warn('No audio files found in public/audio directory');
+            return;
+        }
+    } catch (error) {
+        console.error('Error reading audio directory:', error);
+        return;
+    }
+
     this.playlist = songs.sort(() => Math.random() - 0.5);
   }
 

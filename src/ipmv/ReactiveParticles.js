@@ -14,6 +14,10 @@ uniform float maxDistance;
 uniform float lowFreq;
 uniform float midFreq;
 uniform float highFreq;
+uniform float bassPower; 
+uniform float midPower;
+uniform float curlIntensity;
+
 
 vec3 mod289(vec3 x){
   return x-floor(x*(1./289.))*289.;
@@ -123,16 +127,27 @@ vec3 curl(float x,float y,float z) {
 
 void main() {
   vec3 newpos = position;
-  vec3 target = position + (normal*.1) + curl(newpos.x * frequency, newpos.y * frequency, newpos.z * frequency) * amplitude;
   
+  // Calcul séparé du bruit curl
+  vec3 curlOffset = curl(newpos.x * frequency, newpos.y * frequency, newpos.z * frequency) * amplitude;
+  vec3 baseOffset = normal * (0.1 + lowFreq * 0.3);
+vec3 target = position + baseOffset + curlOffset * curlIntensity;
+    
   float d = length(newpos - target) / maxDistance;
   newpos = mix(position, target, pow(d, 4.));
+  
+  // Déplacements audio-réactifs
+  float audioInfluence = smoothstep(0.3, 0.9, lowFreq);
+  vec3 audioOffset = vec3(
+  sin(time * 12.0) * pow(lowFreq, bassPower) * 0.03,
+  cos(time * 10.0) * pow(midFreq, midPower) * 0.02,
+  sin(time * 8.0 * exp(-lowFreq * 2.0)) * lowFreq * 0.05
+);
+
+  // Combinaison harmonieuse
+  newpos += mix(vec3(0.0), audioOffset, audioInfluence);
   newpos.z += sin(time) * (.1 * offsetGain);
 
-  newpos.x += sin(time * 10.0) * lowFreq * 0.01;
-  newpos.y += cos(time * 8.0) * midFreq * 0.01;
-
-  
   vec4 mvPosition = modelViewMatrix * vec4(newpos, 1.);
   gl_PointSize = size + (pow(d,3.) * offsetSize) * (1./-mvPosition.z);
   gl_Position = projectionMatrix * mvPosition;
@@ -178,6 +193,10 @@ export class ReactiveParticles extends THREE.Object3D {
       endColor: 0x00ffff,
       autoMix: true,
       autoRotate: true,
+      amplitudeLimits: { min: 0.1, max: 3 },
+    frequencyLimits: { min: 0.1, max: 5 },
+    bassPowerLimits: { min: 0.5, max: 4 },
+    midPowerLimits: { min: 0.5, max: 3 },
     }
     this.basePosition = new THREE.Vector3(3.5, 23.5, 5); // Position fixe désirée
     this.position.copy(this.basePosition);
@@ -205,10 +224,14 @@ export class ReactiveParticles extends THREE.Object3D {
         frequency: { value: 2 },
         amplitude: { value: 1 },
         offsetGain: { value: 0 },
-        maxDistance: { value: 1.8 },
+        maxDistance: { value: 1.4 },
         lowFreq: { value: 0 },
         midFreq: { value: 0 },
         highFreq: { value: 0 },
+        bassPower: { value: 2.0 },
+        midPower: { value: 1.5 },
+        curlIntensity: { value: 1.0 },
+
         startColor: { value: new THREE.Color(this.properties.startColor) },
         endColor: { value: new THREE.Color(this.properties.endColor) },
       },
@@ -302,6 +325,105 @@ export class ReactiveParticles extends THREE.Object3D {
     })
   }
 
+  createSphereMesh() {
+    const radius = THREE.MathUtils.randFloat(0.5, 2);
+    const widthSegments = THREE.MathUtils.randInt(8, 64);
+    const heightSegments = THREE.MathUtils.randInt(8, 64);
+    this.geometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+  
+    this.material.uniforms.offsetSize.value = THREE.MathUtils.randInt(30, 60);
+    this.material.uniforms.size.value = 1.1;
+    this.material.needsUpdate = true;
+  
+    this.pointsMesh = new THREE.Points(this.geometry, this.material);
+    this.pointsMesh.rotation.set(
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI)
+    );
+    this.holderObjects.add(this.pointsMesh);
+  
+    gsap.to(this.pointsMesh.rotation, {
+      duration: THREE.MathUtils.randFloat(5, 10),
+      x: Math.random() * Math.PI * 2,
+      y: Math.random() * Math.PI * 2,
+      z: Math.random() * Math.PI * 2,
+      ease: 'power2.inOut'
+    });
+  
+    gsap.to(this.position, {
+      duration: 0.6,
+      z: this.basePosition.z + THREE.MathUtils.randFloat(-0.2, 0.2),
+      ease: 'elastic.out(0.8)',
+    });
+  }
+  
+  createTorusMesh() {
+    const radius = THREE.MathUtils.randFloat(0.3, 1.5);
+    const tube = THREE.MathUtils.randFloat(0.1, 0.5);
+    const radialSegments = THREE.MathUtils.randInt(8, 64);
+    const tubularSegments = THREE.MathUtils.randInt(8, 64);
+    this.geometry = new THREE.TorusGeometry(radius, tube, radialSegments, tubularSegments);
+  
+    this.material.uniforms.offsetSize.value = THREE.MathUtils.randInt(30, 60);
+    this.material.uniforms.size.value = 1.1;
+    this.material.needsUpdate = true;
+  
+    this.pointsMesh = new THREE.Points(this.geometry, this.material);
+    this.pointsMesh.rotation.set(
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI)
+    );
+    this.holderObjects.add(this.pointsMesh);
+  
+    gsap.to(this.pointsMesh.rotation, {
+      duration: THREE.MathUtils.randFloat(5, 10),
+      x: Math.random() * Math.PI * 2,
+      y: Math.random() * Math.PI * 2,
+      z: Math.random() * Math.PI * 2,
+      ease: 'power2.inOut'
+    });
+  
+    gsap.to(this.position, {
+      duration: 0.6,
+      z: this.basePosition.z + THREE.MathUtils.randFloat(-0.2, 0.2),
+      ease: 'elastic.out(0.8)',
+    });
+  }
+  
+  createIcosahedronMesh() {
+    const radius = THREE.MathUtils.randFloat(0.5, 2);
+    const detail = THREE.MathUtils.randInt(0, 3);
+    this.geometry = new THREE.IcosahedronGeometry(radius, detail);
+  
+    this.material.uniforms.offsetSize.value = THREE.MathUtils.randInt(30, 60);
+    this.material.uniforms.size.value = 1.1;
+    this.material.needsUpdate = true;
+  
+    this.pointsMesh = new THREE.Points(this.geometry, this.material);
+    this.pointsMesh.rotation.set(
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI),
+      THREE.MathUtils.randFloat(0, Math.PI)
+    );
+    this.holderObjects.add(this.pointsMesh);
+  
+    gsap.to(this.pointsMesh.rotation, {
+      duration: THREE.MathUtils.randFloat(5, 10),
+      x: Math.random() * Math.PI * 2,
+      y: Math.random() * Math.PI * 2,
+      z: Math.random() * Math.PI * 2,
+      ease: 'power2.inOut'
+    });
+  
+    gsap.to(this.position, {
+      duration: 0.6,
+      z: this.basePosition.z + THREE.MathUtils.randFloat(-0.2, 0.2),
+      ease: 'elastic.out(0.8)',
+    });
+  }
+
   connectAudio(audioManager) {
     if (!audioManager?.update) { // Vérification plus flexible
       console.error('AudioManager invalide:', audioManager);
@@ -341,8 +463,8 @@ export class ReactiveParticles extends THREE.Object3D {
      } 
 
      gsap.to(this.material.uniforms.size, {
-      value: 5.5,
-      duration: 0.07,
+      value: 1.5,
+      duration: 0.01,
       yoyo: true,
       repeat: 1,
       ease: 'power2.out'
@@ -353,6 +475,24 @@ export class ReactiveParticles extends THREE.Object3D {
       duration: 0.3,
       yoyo: true,
       ease: 'elastic.out(1, 0.3)'
+    });
+
+    const { low } = this.audioManager.frequencyData;
+    const intensity = THREE.MathUtils.clamp(low * 2.5, 0.5, 2.0);
+
+    gsap.to(this.material.uniforms.size, {
+      value: 1.0 * intensity,
+      duration: 0.1 * (1.5 - intensity/2),
+      yoyo: true,
+      repeat: 1,
+      ease: 'power4.out'
+    });
+
+    // Déformation géométrique pulsée
+    gsap.to(this.material.uniforms.amplitude, {
+      value: 1.5 * intensity,
+      duration: 0.15,
+      ease: 'back.out(2)'
     });
   
   // Ajouter un cooldown entre les changements
@@ -367,14 +507,27 @@ export class ReactiveParticles extends THREE.Object3D {
     if (!this.properties.autoMix) return
     
     this.destroyMesh()
-    Math.random() < 0.5 ? this.createCylinderMesh() : this.createBoxMesh()
-
+    const r = Math.random()
+    
+    if (r < 0.3) {
+      this.createBoxMesh()
+    } else if (r < 0.6) {
+      this.createCylinderMesh()
+    } else if (r < 0.75) {
+      this.createSphereMesh()
+    } else if (r < 0.9) {
+      this.createTorusMesh()
+    } else {
+      this.createIcosahedronMesh()
+    }
+  
     gsap.to(this.material.uniforms.frequency, {
       duration: (this.bpmManager.getBPMDuration() / 1000) * 2 || 2,
       value: THREE.MathUtils.randFloat(0.5, 3),
       ease: 'expo.easeInOut',
     })
   }
+  
 
   destroyMesh() {
     if (!this.initialized || !this.pointsMesh) return
@@ -389,91 +542,35 @@ export class ReactiveParticles extends THREE.Object3D {
 
     update() {
       if (!this.initialized) return
-    
-      const isPlaying = this.audioManager?.isPlaying
-      const frequencyData = this.audioManager?.frequencyData
-    
-      if (isPlaying && frequencyData) {
-        this.material.uniforms.lowFreq.value = frequencyData.low;
-        this.material.uniforms.midFreq.value = frequencyData.mid;
-        this.material.uniforms.highFreq.value = frequencyData.high;
+      const { low, mid } = this.audioManager?.frequencyData || { low: 0, mid: 0 };
+      
+      // Application d'une courbe exponentielle
+      const bassImpact = THREE.MathUtils.smoothstep(low, 0.7, 1.0) * 2.5;
+      const midImpact = THREE.MathUtils.smoothstep(mid, 0.6, 0.9) * 1.8;
+      
+      // Réponse non-linéaire avec seuil
+      this.material.uniforms.lowFreq.value = Math.pow(low, 3) * bassImpact;
+      this.material.uniforms.midFreq.value = Math.pow(mid, 2) * midImpact;
 
-        this.material.uniforms.amplitude.value = 0.8 + 
-          THREE.MathUtils.mapLinear(frequencyData.high, 0, 0.6, -0.1, 0.2)
+      const noisePreservation = 1.0 - THREE.MathUtils.smoothstep(low, 0.6, 0.9);
+  this.material.uniforms.curlIntensity.value = 0.8 + noisePreservation * 0.4
 
-          const colorMix = THREE.MathUtils.mapLinear(frequencyData.mid, 0, 1, 0.2, 0.8);
-          this.material.uniforms.startColor.value.lerp(
-            new THREE.Color().setHSL(Math.sin(this.time * 0.5) % 1, 1, 0.5), 
-            colorMix
-          );
-        
-        this.material.uniforms.offsetGain.value = frequencyData.mid * 0.6
-        
-        const t = THREE.MathUtils.mapLinear(frequencyData.low, 0.6, 1, 0.2, 0.5)
-        this.time += THREE.MathUtils.clamp(t, 0.2, 0.5)
-      } else {
-        // Comportement original quand pas d'audio
-        this.material.uniforms.frequency.value = 0.8
-        this.material.uniforms.amplitude.value = 1
-        this.time += 0.2
-      }
-    
-      this.material.uniforms.time.value = this.time
-    
-      // Ajout spécifique à votre version pour le mouvement aléatoire
-      if (Math.random() < 0.005) {
-        this.position.set(
-          this.basePosition.x + THREE.MathUtils.randFloat(-0.05, 0.05),
-          this.basePosition.y + THREE.MathUtils.randFloat(-0.05, 0.05),
-          this.basePosition.z + THREE.MathUtils.randFloat(-0.1, 0.1)
-        );
-      }
+      // Adaptation dynamique de l'amplitude
+      this.material.uniforms.amplitude.value = THREE.MathUtils.clamp(
+    0.9 - (bassImpact * 0.3), 
+    0.5, // valeur minimale
+    1.2  // valeur maximale
+  );
+      
+      // Synchronisation BPM
+      const bpmFactor = this.bpmManager.getBPMDuration() / 1000;
+      this.time += (0.1 + bassImpact * 0.05) * bpmFactor;
+      
+      this.material.uniforms.time.value = this.time;
+      
+      
+      
     }
-
-  addGUI() {
-    if (!this.initialized || !this.gui) return
-    
-    //Add GUI controls
-    const gui = this.gui
-    const particlesFolder = gui.addFolder('PARTICLES')
-    particlesFolder
-      .addColor(this.properties, 'startColor')
-      .listen()
-      .name('Start Color')
-      .onChange((e) => {
-        this.material.uniforms.startColor.value = new THREE.Color(e)
-      })
-
-    particlesFolder
-      .addColor(this.properties, 'endColor')
-      .listen()
-      .name('End Color')
-      .onChange((e) => {
-        this.material.uniforms.endColor.value = new THREE.Color(e)
-      })
-
-    const visualizerFolder = gui.addFolder('VISUALIZER')
-    visualizerFolder.add(this.properties, 'autoMix').listen().name('Auto Mix')
-    visualizerFolder.add(this.properties, 'autoRotate').listen().name('Auto Rotate')
-
-    const buttonShowBox = {
-      showBox: () => {
-        this.destroyMesh()
-        this.createBoxMesh()
-        this.properties.autoMix = false
-      },
-    }
-    visualizerFolder.add(buttonShowBox, 'showBox').name('Show Box')
-
-    const buttonShowCylinder = {
-      showCylinder: () => {
-        this.destroyMesh()
-        this.createCylinderMesh()
-        this.properties.autoMix = false
-      },
-    }
-    visualizerFolder.add(buttonShowCylinder, 'showCylinder').name('Show Cylinder')
-  }
 
   setResolution(width, height) {
     if (!this.initialized || !this.material?.uniforms) return

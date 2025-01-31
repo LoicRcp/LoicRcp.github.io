@@ -1,7 +1,7 @@
 import React from 'react';
 import { DEFAULT_EFFECTS_CONFIG as defaultConfig } from '../../config/effects';
 
-const ControlSlider = ({ label, value, onChange, min, max, step = 0.01 }) => (
+export const ControlSlider = ({ label, value, onChange, min, max, step = 0.01 }) => (
   <div className="mb-4">
     <div className="flex justify-between mb-1">
       <label className="text-sm text-white">{label}</label>
