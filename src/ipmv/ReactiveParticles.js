@@ -185,9 +185,9 @@ void main(){
   vec2 uv = vec2(gl_PointCoord.x,1.-gl_PointCoord.y);
   vec3 circ = vec3(circle(uv,1.));
 
-  vec3 color = mix(start, end, smoothstep(0.25, 0.75, t));
+  vec3 color = mix(start, end, smoothstep(0.1, 0.9, t * 1.2 - 0.1));
   color = pow(color, vec3(1.0/gammaCorrection));
-  float alpha = circ.r * (1.0 - 0.5 * t);
+  float alpha = circ.r * mix(0.8, 1.2, abs(t - 0.5));
 
   gl_FragColor = vec4(color, alpha);
 }`;
@@ -538,6 +538,10 @@ export class ReactiveParticles extends THREE.Object3D {
     } else {
       this.createIcosahedronMesh()
     }
+
+    const [color1, color2] = ColorHarmony.getRandomPair();
+    this.material.uniforms.startColor.value = color1;
+    this.material.uniforms.endColor.value = color2;
   
     gsap.to(this.material.uniforms.frequency, {
       duration: (this.bpmManager.getBPMDuration() / 1000) * 2 || 2,
@@ -620,5 +624,29 @@ export class ReactiveParticles extends THREE.Object3D {
     // Reset state
     this.initialized = false
     this.audioAnalyser = null
+  }
+}
+
+
+class ColorHarmony {
+  static getComplementary() {
+    const baseHSL = { h: Math.random(), s: 0.8, l: 0.5 };
+    return [
+      new THREE.Color().setHSL(baseHSL.h, baseHSL.s, baseHSL.l),
+      new THREE.Color().setHSL((baseHSL.h + 0.5) % 1, baseHSL.s, baseHSL.l)
+    ];
+  }
+
+  static getAnalogous() {
+    const baseH = Math.random();
+    return [
+      new THREE.Color().setHSL((baseH - 0.1 + 1) % 1, 0.8, 0.5),
+      new THREE.Color().setHSL((baseH + 0.1) % 1, 0.8, 0.5)
+    ];
+  }
+
+  static getRandomPair() {
+    const methods = [this.getComplementary, this.getAnalogous];
+    return methods[Math.floor(Math.random() * methods.length)]();
   }
 }
