@@ -206,7 +206,9 @@ const Scene = () => {
                 if (now - lastProgressUpdate >= 100) {
                     const currentTime = audioManager.getCurrentTime();
                     const duration = audioManager.currentTrackDuration || 1;
-                    setProgress((currentTime / duration) * 100);
+                    const newProgress = (currentTime / duration) * 100;
+                console.log(`Time: ${currentTime.toFixed(2)}s / ${duration.toFixed(2)}s = ${newProgress.toFixed(2)}%`);
+                setProgress(newProgress);
                     lastProgressUpdate = now;
                 }
             }
@@ -281,7 +283,7 @@ const Scene = () => {
         <div className="relative w-full h-full">
           <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
                   {isRendererReady && (
-                    <div className="absolute top-0 left-0 right-0 flex justify-between items-start pt-4 px-4 pb-0 backdrop-blur-sm border-cyan-electric/30 crt-overlay">
+                    <div className="fixed top-0 left-0 right-0 z-50 flex justify-between items-start pt-4 px-4 pb-0 backdrop-blur-sm border-cyan-electric/30 crt-overlay">
                       {/* Contrôle audio avec progress bar */}
               <AudioControls
                 onPlay={handlePlay}

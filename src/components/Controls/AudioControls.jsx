@@ -10,15 +10,12 @@ export default function AudioControls({
     progress
 }) {
     return (
-        <div className="absolute bottom-4 right-4 flex flex-col gap-3 items-end 
+        <div className="relative flex flex-col gap-3 items-end 
                       bg-black/50 backdrop-blur-sm p-3 border-2 border-cyan-electric/30
                       crt-overlay text-white">  {/* Added text-white here */}
-            {/* Progress bar */}
-            <div className="w-64 h-1 bg-gray-900/80 rounded-sm">
-                <div
-                    className="h-full bg-cyan-electric transition-[width] duration-100 ease-linear"
-                    style={{ width: `${progress}%` }}
-                />
+            {/* Progress indicator */}
+            <div className="font-mono text-sm text-cyan-electric tracking-wider">
+                PROG [{ Math.floor(progress).toString().padStart(3, '0') }%]
             </div>
 
             <div className="flex gap-3 items-center">
