@@ -1,5 +1,6 @@
 export const sections = [
   `// Format un peu particulier pour cette candidature...
+  // Appuyez sur F11, c'est mieux en plein écran :)
 // Appuyez sur Entrée pour avancer dans le texte
 // Activez le son pour la musique et les effets visuels !
 

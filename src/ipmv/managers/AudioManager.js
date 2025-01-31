@@ -130,8 +130,17 @@ async loadAudioBuffer() {
         this.audio.setBuffer(buffer);
         this.currentTrackDuration = buffer.duration;
         this.audio.setLoop(false);
-        this.audio.onEnded = () => {
-          this.nextTrack().catch(console.error);
+        
+        // Update ended handler with forced resume
+        this.audio.onEnded = async () => {
+          try {
+            if (this.audioContext?.state === 'suspended') {
+              await this.audioContext.resume();
+            }
+            await this.nextTrack();
+          } catch (error) {
+            console.error('Auto-next error:', error);
+          }
         };
 
         this.analyser = new THREE.AudioAnalyser(this.audio, 1024);
@@ -156,43 +165,63 @@ async loadAudioBuffer() {
   async nextTrack() {
     const wasPlaying = this.isPlaying;
 
+    // Reset timing state
     this.trackStartTime = 0;
     this.pauseTime = 0;
     this.currentTrackDuration = 0;
 
-
-    // Arrêter proprement la lecture actuelle
+    // Cleanup current audio
     if (this.audio) {
       this.audio.stop();
       this.audio.disconnect();
       this.isPlaying = false;
     }
 
-    // Changer de piste
+    // Move to next track
     this.currentTrackIndex = (this.currentTrackIndex + 1) % this.playlist.length;
 
-    // Recharger le buffer
+    // Load new buffer
     await this.loadAudioBuffer();
 
-    // Redémarrer la lecture si nécessaire
+    // Force resume context and restart playback if needed
     if (wasPlaying) {
-      await this.play();
+      try {
+        // Double-check context state
+        if (this.audioContext?.state === 'suspended') {
+          await this.audioContext.resume();
+        }
+        
+        // Start playback with fresh context
+        await this.play();
+      } catch (error) {
+        console.error('Playback restart error:', error);
+        this.isPlaying = false;
+      }
     }
   }
 
   async play() {
-    if (this.audioContext?.state === 'suspended') {
-      await this.audioContext.resume();
-    }
-    this.audio.play();
-    this.isPlaying = true;
+    try {
+      // Ensure context is running
+      if (this.audioContext?.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+      
+      // Explicitly start playback from current position
+      this.audio.play();
+      this.isPlaying = true;
 
-    if (this.pauseTime > 0) {
-      const pauseDuration = this.audioContext.currentTime - this.pauseTime;
-      this.trackStartTime += pauseDuration;
-      this.pauseTime = 0;
-    } else {
-      this.trackStartTime = this.audioContext.currentTime;
+      // Update timing tracking
+      if (this.pauseTime > 0) {
+        const pauseDuration = this.audioContext.currentTime - this.pauseTime;
+        this.trackStartTime += pauseDuration;
+        this.pauseTime = 0;
+      } else {
+        this.trackStartTime = this.audioContext.currentTime;
+      }
+    } catch (error) {
+      console.error('Play error:', error);
+      this.isPlaying = false;
     }
   }
 

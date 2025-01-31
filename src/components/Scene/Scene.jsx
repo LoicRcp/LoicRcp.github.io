@@ -120,25 +120,16 @@ const Scene = () => {
 
     const handleNext = async () => {
         try {
-            const wasPlaying = isPlaying;
-            if (wasPlaying) await audioManager.pause();
-    
+            // Simply delegate to AudioManager's nextTrack
             await audioManager.nextTrack();
             setProgress(0);
             
             if (audioManager.audio?.buffer) {
-                await bpmManager.detectBPM(audioManager.audio.buffer);
+              await bpmManager.detectBPM(audioManager.audio.buffer);
             }
-            
-            if (wasPlaying) {
-                if (audioManager.audioContext?.state === 'suspended') {
-                  await audioManager.audioContext.resume();
-                }
-                await audioManager.play();
-              }
-        } catch (error) {
-            console.error('Erreur changement piste:', error);
-        }
+          } catch (error) {
+            console.error('Track change error:', error);
+          }
     };
 
     useEffect(() => {
