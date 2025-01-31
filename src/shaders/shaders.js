@@ -12,32 +12,54 @@ export const baseVertexShader = `
 export const luminanceFragmentShader = `
     uniform sampler2D tDiffuse;
     uniform float luminanceBase;
+    uniform float time;
     varying vec2 vUv;
 
+    // Fonction random pour l'interférence magnétique
+    float random(vec2 st) {
+        return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+    }
+
     void main() {
+        // Déformation horizontale combinée
+        vec2 uv = vUv;
+        float warpIntensity = sin(uv.x * 150.0 + time * 10.0) * 0.0001;
+        warpIntensity += sin(uv.x * 100.0 + time * 8.0) * 0.0005; // Ajout d'une seconde fréquence
+        uv.y += warpIntensity;
+
         // Effet de vignettage
         vec2 center = vUv - 0.5;
         float vignette = 1.0 - dot(center, center) * 1.2;
         vignette = smoothstep(0.0, 1.0, vignette);
 
-        vec4 texel = texture2D(tDiffuse, vUv);
+        vec4 texel = texture2D(tDiffuse, uv);
         
         // Ajustement du contraste
         vec3 color = max(texel.rgb, vec3(luminanceBase));
         color = pow(color, vec3(1.1)); // Augmente légèrement le contraste
 
-        // Légère teinte verdâtre pour l'ambiance phosphore
-        vec3 tint = vec3(0.7, 1.3, 0.8);
-        color *= tint;
+        // Teinte phosphore renforcée (combinaison des deux effets)
+        vec3 phosphorTint = vec3(0.7, 1.3, 0.8);
+        color *= phosphorTint;
 
-        // Application du vignettage
+        // Application du vignettage et boost de luminosité
         color *= vignette;
-
-        // Léger boost de luminosité au centre
         color *= 1.0 + (vignette * 0.4);
 
         // Boost du glow vert
-        color.g *= 1.2;  // Boost supplémentaire sur le canal vert
+        color.g *= 1.2;
+
+        // Variation des scanlines avec jitter
+        float scanJitter = sin(uv.y * 800.0 + time * 5.0) * 0.0005;
+        float scanline = 1.0 - smoothstep(0.499, 0.501, fract(uv.y * 240.0 + scanJitter));
+        // Atténuation légère des scanlines pour ne pas trop assombrir
+        scanline = mix(1.0, scanline, 0.65);
+        color *= scanline;
+
+        // Effet d'interférence magnétique
+        vec2 noiseUv = vUv + vec2(time * 0.1, 0.0); // Déplacement temporel du bruit
+        float interference = random(noiseUv) * 0.03;
+        color.rgb += interference;
 
         gl_FragColor = vec4(color, texel.a);
     }

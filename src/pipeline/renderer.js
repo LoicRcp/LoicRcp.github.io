@@ -12,6 +12,7 @@ import {
     glowHorizontalFragmentShader,
     glowVerticalFragmentShader
 } from '../shaders/shaders';
+import { time } from 'three/tsl';
 
 export class Renderer {
     constructor(canvas) {       
@@ -116,7 +117,8 @@ export class Renderer {
         const luminanceShader = {
             uniforms: {
                 tDiffuse: { value: null },
-                luminanceBase: { value: config.luminance.base }
+                luminanceBase: { value: config.luminance.base },
+                time: { value: 0.0}
             },
             vertexShader: baseVertexShader,
             fragmentShader: luminanceFragmentShader

@@ -88,6 +88,21 @@ export class TextRenderer {
             this.ctx.fillText(line, this.padding, y);
         }
 
+        this.ctx.globalCompositeOperation = 'screen';
+        this.ctx.fillStyle = 'rgba(50, 255, 50, 0.1)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.globalCompositeOperation = 'source-over';
+        
+        // Add random CRT sparkles
+        if(Math.random() < 0.02) {
+        this.ctx.fillStyle = '#fff';
+        this.ctx.fillRect(
+            this.padding + Math.random() * (this.canvas.width - this.padding*2),
+            y + Math.random() * 10,
+            1, 1
+        );
+        }
+    
         // Ajouter le curseur clignotant
         this.ctx.fillText('_', this.padding + this.ctx.measureText(line).width + 10, y);
     }

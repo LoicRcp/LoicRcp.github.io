@@ -16,14 +16,19 @@ const Terminal = ({ onSectionComplete }) => {
   useKeyboardNav(nextSection, isComplete);
 
   return (
-    <div className="absolute left-0 top-0 w-1/2 h-full bg-transparent p-8">
-      <div className="font-mono text-green-500 whitespace-pre-wrap">
+    <div className="relative retro-terminal-container">
+      <div className="font-mono text-green-500 whitespace-pre-wrap relative z-10">
         {displayedText}
-        <span className="animate-pulse">_</span>
+        <span className="animate-blink">_</span>
       </div>
+      {/* Add CRT overlay effects */}
+      <div className="crt-overlay" />
+      <div className="crt-glow" />
+      
+      {/* Existing prompt */}
       {isComplete && currentSection < sections.length - 1 && (
-        <div className="mt-4 text-sm text-gray-500">
-          Press Enter to continue...
+        <div className="mt-4 text-sm text-cyan-300 opacity-80 vintage-prompt">
+          [Press Enter] ░▒▓ CONTINUE
         </div>
       )}
     </div>
